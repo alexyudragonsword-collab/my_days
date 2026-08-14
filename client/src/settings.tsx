@@ -1,12 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
 import React, { createContext, useContext, useEffect } from 'react';
 import { apiPut, queryClient } from './api';
+import { setLang } from './i18n';
 
 export type Appearance = 'default' | 'glass' | 'notion' | 'brutal';
 
 export interface AppSettings {
   theme: 'light' | 'dark' | 'auto';
   appearance: Appearance;
+  language: 'zh' | 'en';
   week_start: 0 | 1;
   date_format: 'iso' | 'cn' | 'slash';
   home_summaries: Record<string, boolean>;
@@ -17,6 +19,7 @@ export interface AppSettings {
 export const DEFAULT_SETTINGS: AppSettings = {
   theme: 'auto',
   appearance: 'default',
+  language: 'zh',
   week_start: 1,
   date_format: 'iso',
   home_summaries: { media: true, dev: true, consult: true, fitness: true, diet: true, games: true },
@@ -46,6 +49,8 @@ export function SettingsProvider(props: { children: React.ReactNode }) {
     queryFn: () => fetch('/api/settings').then((r) => r.json()),
   });
   const settings: AppSettings = { ...DEFAULT_SETTINGS, ...(query.data || {}) };
+  // 在渲染子组件之前设定当前语言，保证所有 t() 调用拿到正确语言
+  setLang(settings.language === 'en' ? 'en' : 'zh');
 
   useEffect(() => {
     const root = document.documentElement;
@@ -77,6 +82,11 @@ export function SettingsProvider(props: { children: React.ReactNode }) {
         return dateStr;
     }
   };
+
+  // 设置加载完成前不渲染页面，避免语言与主题闪烁
+  if (query.isLoading) {
+    return <div style={{ padding: 40, textAlign: 'center', color: '#888' }}>…</div>;
+  }
 
   return (
     <SettingsContext.Provider value={{ settings, update, fmtDate }}>

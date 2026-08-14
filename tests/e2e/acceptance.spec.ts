@@ -109,12 +109,32 @@ test('AC-027/AC-028 回收站恢复与永久删除确认', async ({ page }) => {
 test('AC-029 外观与主题设置刷新后生效', async ({ page }) => {
   await page.goto('/settings');
   await page.click('.appearance-option[data-preview="brutal"]');
-  await page.selectOption('.card:has-text("使用偏好") select >> nth=0', 'dark');
+  await page.selectOption('.field:has(label:text-is("主题")) select', 'dark');
   await page.reload();
   await expect
     .poll(async () => page.evaluate(() => [document.documentElement.dataset.appearance, document.documentElement.dataset.theme]))
     .toEqual(['brutal', 'dark']);
   await page.goto('/settings');
   await page.click('.appearance-option[data-preview="default"]');
-  await page.selectOption('.card:has-text("使用偏好") select >> nth=0', 'auto');
+  await page.selectOption('.field:has(label:text-is("主题")) select', 'auto');
+});
+
+test('中英文切换生效、持久，且不影响业务数据', async ({ page }) => {
+  await page.goto('/plan');
+  await expect(page.locator('.list-item').first()).toBeVisible();
+  const itemCount = await page.locator('.list-item').count();
+
+  await page.goto('/settings');
+  await page.selectOption('.field:has(label:has-text("语言")) select', 'en');
+  await expect(page.locator('a.nav-item:has-text("Development")')).toBeVisible({ timeout: 10_000 });
+  await page.reload();
+  await expect(page.locator('a.nav-item:has-text("Data & Settings")')).toBeVisible();
+
+  // 业务数据不受语言切换影响
+  await page.goto('/plan');
+  await expect(page.locator('.list-item')).toHaveCount(itemCount);
+
+  await page.goto('/settings');
+  await page.selectOption('.field:has(label:has-text("Language")) select', 'zh');
+  await expect(page.locator('a.nav-item:has-text("数据与设置")')).toBeVisible({ timeout: 10_000 });
 });

@@ -4,6 +4,7 @@ import { PlanItemRow } from '../components/PlanItemRow';
 import { PLAN_STATUSES, PRIORITIES } from '../constants';
 import { useClearOpenParam, useDraft, useOpenParam, useTable } from '../hooks';
 import { useSettings } from '../settings';
+import { t, weekdayName } from '../i18n';
 import { Drawer, EmptyState, Field, QueryView, useUI } from '../ui';
 
 function AddPlanForm(props: { date: string }) {
@@ -14,10 +15,10 @@ function AddPlanForm(props: { date: string }) {
   const { toast } = useUI();
 
   const submit = async () => {
-    const t = title.trim();
-    if (!t) return;
+    const v = title.trim();
+    if (!v) return;
     await createRow('plan_items', {
-      title: t,
+      title: v,
       date: props.date,
       start_time: time || null,
       duration_min: duration ? Number(duration) : null,
@@ -27,7 +28,7 @@ function AddPlanForm(props: { date: string }) {
     setTitle('');
     setTime('');
     setDuration('');
-    toast('已添加计划事项');
+    toast(t('已添加计划事项'));
   };
 
   return (
@@ -35,17 +36,17 @@ function AddPlanForm(props: { date: string }) {
       <input
         className="input"
         style={{ flex: 2, minWidth: 180 }}
-        placeholder="添加事项，回车创建"
+        placeholder={t('添加事项，回车创建')}
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         onKeyDown={(e) => e.key === 'Enter' && submit()}
       />
-      <input className="input" type="time" style={{ width: 110 }} value={time} onChange={(e) => setTime(e.target.value)} title="开始时间（可选）" />
-      <input className="input" type="number" style={{ width: 90 }} placeholder="分钟" value={duration} onChange={(e) => setDuration(e.target.value)} title="预计时长（分钟，可选）" />
+      <input className="input" type="time" style={{ width: 110 }} value={time} onChange={(e) => setTime(e.target.value)} title={t('开始时间（可选）')} />
+      <input className="input" type="number" style={{ width: 90 }} placeholder={t('分钟')} value={duration} onChange={(e) => setDuration(e.target.value)} title={t('预计时长（分钟，可选）')} />
       <select className="input" style={{ width: 70 }} value={priority} onChange={(e) => setPriority(e.target.value)}>
-        {PRIORITIES.map((p) => <option key={p}>{p}</option>)}
+        {PRIORITIES.map((p) => <option key={p} value={p}>{t(p)}</option>)}
       </select>
-      <button className="btn primary" onClick={submit}>添加</button>
+      <button className="btn primary" onClick={submit}>{t('添加')}</button>
     </div>
   );
 }
@@ -75,45 +76,45 @@ export function PlanItemEditor(props: { item: Row; onClose: () => void }) {
       note: form.note || null,
     });
     invalidateTable('plan_items');
-    toast('已保存');
+    toast(t('已保存'));
     props.onClose();
   };
 
   return (
-    <Drawer title="编辑计划事项" onClose={props.onClose}>
-      <Field label="标题">
+    <Drawer title={t('编辑计划事项')} onClose={props.onClose}>
+      <Field label={t('标题')}>
         <input className="input" value={form.title} onChange={(e) => set('title', e.target.value)} />
       </Field>
       <div className="grid-2">
-        <Field label="日期">
+        <Field label={t('日期')}>
           <input className="input" type="date" value={form.date} onChange={(e) => set('date', e.target.value)} />
         </Field>
-        <Field label="开始时间">
+        <Field label={t('开始时间')}>
           <input className="input" type="time" value={form.start_time} onChange={(e) => set('start_time', e.target.value)} />
         </Field>
-        <Field label="预计时长（分钟）">
+        <Field label={t('预计时长（分钟）')}>
           <input className="input" type="number" value={form.duration_min} onChange={(e) => set('duration_min', e.target.value)} />
         </Field>
-        <Field label="优先级">
+        <Field label={t('优先级')}>
           <select className="input" value={form.priority} onChange={(e) => set('priority', e.target.value)}>
-            {PRIORITIES.map((p) => <option key={p}>{p}</option>)}
+            {PRIORITIES.map((p) => <option key={p} value={p}>{t(p)}</option>)}
           </select>
         </Field>
-        <Field label="状态">
+        <Field label={t('状态')}>
           <select className="input" value={form.status} onChange={(e) => set('status', e.target.value)}>
-            {PLAN_STATUSES.map((s) => <option key={s}>{s}</option>)}
+            {PLAN_STATUSES.map((s) => <option key={s} value={s}>{t(s)}</option>)}
           </select>
         </Field>
       </div>
-      <Field label="备注">
+      <Field label={t('备注')}>
         <textarea className="input" value={form.note} onChange={(e) => set('note', e.target.value)} />
       </Field>
       {props.item.source_module ? (
-        <p className="small muted">该事项关联了来源记录，标题会跟随来源记录实时显示。</p>
+        <p className="small muted">{t('该事项关联了来源记录，标题会跟随来源记录实时显示。')}</p>
       ) : null}
       <div className="row" style={{ justifyContent: 'flex-end' }}>
-        <button className="btn" onClick={props.onClose}>取消</button>
-        <button className="btn primary" onClick={save}>保存</button>
+        <button className="btn" onClick={props.onClose}>{t('取消')}</button>
+        <button className="btn primary" onClick={save}>{t('保存')}</button>
       </div>
     </Drawer>
   );
@@ -133,17 +134,17 @@ export function DailyReviewCard(props: { date: string }) {
       }
       invalidateTable('daily_reviews');
     } catch (e) {
-      toast('复盘保存失败：' + (e instanceof Error ? e.message : e), { error: true });
+      toast(t('复盘保存失败：') + (e instanceof Error ? e.message : e), { error: true });
     }
   };
   const draft = useDraft(String(existing?.content || ''), save);
   return (
     <div className="card">
-      <h3>当日复盘 <span className="sub">{props.date}（输入后自动保存）</span></h3>
+      <h3>{t('当日复盘')} <span className="sub">{props.date}{t('（输入后自动保存）')}</span></h3>
       <textarea
         className="input"
         rows={3}
-        placeholder="今天完成了什么？有什么值得记录或改进的？"
+        placeholder={t('今天完成了什么？有什么值得记录或改进的？')}
         value={draft.value}
         onChange={(e) => draft.setValue(e.target.value)}
         onBlur={draft.flush}
@@ -198,23 +199,23 @@ export default function TodayPlanPage() {
   return (
     <div>
       <div className="page-head">
-        <h2>今日计划</h2>
+        <h2>{t('今日计划')}</h2>
         <div className="tabs">
-          <button className={tab === 'today' ? 'active' : ''} onClick={() => setTab('today')}>今日</button>
-          <button className={tab === 'week' ? 'active' : ''} onClick={() => setTab('week')}>本周</button>
-          <button className={tab === 'history' ? 'active' : ''} onClick={() => setTab('history')}>历史</button>
+          <button className={tab === 'today' ? 'active' : ''} onClick={() => setTab('today')}>{t('今日')}</button>
+          <button className={tab === 'week' ? 'active' : ''} onClick={() => setTab('week')}>{t('本周')}</button>
+          <button className={tab === 'history' ? 'active' : ''} onClick={() => setTab('history')}>{t('历史')}</button>
         </div>
       </div>
 
       {tab === 'today' && (
         <>
           <div className="card">
-            <h3>今天 <span className="sub">{fmtDate(today)}</span></h3>
+            <h3>{t('今天')} <span className="sub">{fmtDate(today)}</span></h3>
             <AddPlanForm date={today} />
             <QueryView
               query={todayQuery}
               isEmpty={(rows) => rows.length === 0}
-              empty={<EmptyState icon="🗓️" text="今天还没有安排事项" hint="用上方输入框添加，或在各模块中把行动加入今日计划" />}
+              empty={<EmptyState icon="🗓️" text={t('今天还没有安排事项')} hint={t('用上方输入框添加，或在各模块中把行动加入今日计划')} />}
             >
               {(rows) => (
                 <div>
@@ -235,16 +236,16 @@ export default function TodayPlanPage() {
             <>
               {weekDates.map((d) => {
                 const dayRows = rows.filter((r) => r.date === d);
-                const weekday = '日一二三四五六'[new Date(d + 'T12:00:00').getDay()];
+                const weekday = weekdayName(new Date(d + 'T12:00:00').getDay());
                 return (
                   <div className="card" key={d}>
                     <h3>
-                      {fmtDate(d)} 周{weekday}
-                      {d === today && <span className="badge accent" style={{ marginLeft: 8 }}>今天</span>}
-                      <span className="sub">{dayRows.length} 项</span>
+                      {fmtDate(d)} {weekday}
+                      {d === today && <span className="badge accent" style={{ marginLeft: 8 }}>{t('今天')}</span>}
+                      <span className="sub">{t('{0} 项', dayRows.length)}</span>
                     </h3>
                     {dayRows.length === 0
-                      ? <p className="muted small" style={{ margin: 0 }}>无安排</p>
+                      ? <p className="muted small" style={{ margin: 0 }}>{t('无安排')}</p>
                       : sortPlanItems(dayRows).map((item) => <PlanItemRow key={item.id} item={item} onEdit={setEditing} />)}
                   </div>
                 );
@@ -258,7 +259,7 @@ export default function TodayPlanPage() {
         <QueryView
           query={historyQuery}
           isEmpty={(rows) => rows.length === 0}
-          empty={<EmptyState icon="📜" text="还没有历史记录" hint="过去日期的计划和复盘会显示在这里" />}
+          empty={<EmptyState icon="📜" text={t('还没有历史记录')} hint={t('过去日期的计划和复盘会显示在这里')} />}
         >
           {(rows) => {
             const byDate = new Map<string, Row[]>();
@@ -276,10 +277,10 @@ export default function TodayPlanPage() {
                   const review = reviewsQuery.data?.find((r) => r.date === d);
                   return (
                     <div className="card" key={d}>
-                      <h3>{fmtDate(d)} <span className="sub">完成 {doneCount}/{dayRows.length}</span></h3>
+                      <h3>{fmtDate(d)} <span className="sub">{t('完成')} {doneCount}/{dayRows.length}</span></h3>
                       {sortPlanItems(dayRows).map((item) => <PlanItemRow key={item.id} item={item} onEdit={setEditing} />)}
                       {review && String(review.content).trim() && (
-                        <p className="small muted" style={{ marginBottom: 0 }}>复盘：{String(review.content)}</p>
+                        <p className="small muted" style={{ marginBottom: 0 }}>{t('复盘：')}{String(review.content)}</p>
                       )}
                     </div>
                   );

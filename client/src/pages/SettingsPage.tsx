@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import React from 'react';
 import { apiDelete, apiGet, apiPatch, apiPost, queryClient } from '../api';
+import { t } from '../i18n';
 import { APPEARANCES, useSettings } from '../settings';
 import { EmptyState, Field, fmtDateTime, fmtSize, QueryView, useUI } from '../ui';
 
@@ -10,19 +11,19 @@ function DataFileCard() {
   const query = useQuery({ queryKey: ['status'], queryFn: () => apiGet<any>('/api/status') });
   return (
     <div className="card">
-      <h3>本地数据文件</h3>
+      <h3>{t('本地数据文件')}</h3>
       <QueryView query={query}>
         {(data) =>
           data.dataFile ? (
             <table className="tbl">
               <tbody>
-                <tr><th style={{ width: 110 }}>文件位置</th><td style={{ wordBreak: 'break-all' }}>{data.dataFile.path}</td></tr>
-                <tr><th>文件大小</th><td>{fmtSize(data.dataFile.size)}</td></tr>
-                <tr><th>最近修改</th><td>{fmtDateTime(data.dataFile.mtime)}</td></tr>
+                <tr><th style={{ width: 110 }}>{t('文件位置')}</th><td style={{ wordBreak: 'break-all' }}>{data.dataFile.path}</td></tr>
+                <tr><th>{t('文件大小')}</th><td>{fmtSize(data.dataFile.size)}</td></tr>
+                <tr><th>{t('最近修改')}</th><td>{fmtDateTime(data.dataFile.mtime)}</td></tr>
               </tbody>
             </table>
           ) : (
-            <p className="muted">尚未找到数据文件</p>
+            <p className="muted">{t('尚未找到数据文件')}</p>
           )
         }
       </QueryView>
@@ -33,10 +34,10 @@ function DataFileCard() {
           } catch {
             /* 无桌面环境时按钮无效果，路径已在上方展示 */
           }
-        }}>打开数据目录</button>
+        }}>{t('打开数据目录')}</button>
       </div>
       <p className="small muted" style={{ marginBottom: 0 }}>
-        所有业务数据都保存在上述 SQLite 文件中，可直接在文件系统中复制该文件做额外备份。
+        {t('所有业务数据都保存在上述 SQLite 文件中，可直接在文件系统中复制该文件做额外备份。')}
       </p>
     </div>
   );
@@ -55,71 +56,71 @@ function BackupsCard() {
     try {
       await apiPost('/api/backups', {});
       refresh();
-      toast('备份已创建');
+      toast(t('备份已创建'));
     } catch (e) {
-      toast('备份失败：' + (e instanceof Error ? e.message : e), { error: true });
+      toast(t('备份失败：') + (e instanceof Error ? e.message : e), { error: true });
     }
   };
 
   const restore = async (b: any) => {
     const ok = await confirm({
-      title: '从备份恢复',
+      title: t('从备份恢复'),
       danger: true,
-      confirmText: '确认恢复',
+      confirmText: t('确认恢复'),
       body: (
         <div>
-          <p>将把全部数据恢复到以下备份创建时的状态：</p>
+          <p>{t('将把全部数据恢复到以下备份创建时的状态：')}</p>
           <table className="tbl">
             <tbody>
-              <tr><th>备份时间</th><td>{fmtDateTime(b.created_at)}</td></tr>
-              <tr><th>文件大小</th><td>{fmtSize(b.size)}</td></tr>
-              <tr><th>类型</th><td>{TYPE_LABEL[b.type] || b.type}</td></tr>
-              <tr><th>备注</th><td>{b.note || '—'}</td></tr>
+              <tr><th>{t('备份时间')}</th><td>{fmtDateTime(b.created_at)}</td></tr>
+              <tr><th>{t('文件大小')}</th><td>{fmtSize(b.size)}</td></tr>
+              <tr><th>{t('类型')}</th><td>{t(TYPE_LABEL[b.type] || b.type)}</td></tr>
+              <tr><th>{t('备注')}</th><td>{b.note || '—'}</td></tr>
             </tbody>
           </table>
-          <p className="small muted">恢复前会自动创建一份当前数据的安全备份。</p>
+          <p className="small muted">{t('恢复前会自动创建一份当前数据的安全备份。')}</p>
         </div>
       ),
     });
     if (!ok) return;
     try {
       await apiPost(`/api/backups/${encodeURIComponent(b.file)}/restore`);
-      toast('恢复成功，正在重新加载…');
+      toast(t('恢复成功，正在重新加载…'));
       setTimeout(() => window.location.reload(), 800);
     } catch (e) {
-      toast('恢复失败，当前数据未被修改：' + (e instanceof Error ? e.message : e), { error: true });
+      toast(t('恢复失败，当前数据未被修改：') + (e instanceof Error ? e.message : e), { error: true });
     }
   };
 
   return (
     <div className="card">
       <div className="row" style={{ justifyContent: 'space-between', marginBottom: 8 }}>
-        <h3 style={{ margin: 0 }}>备份</h3>
-        <button className="btn primary" onClick={createBackup}>立即备份</button>
+        <h3 style={{ margin: 0 }}>{t('备份')}</h3>
+        <button className="btn primary" onClick={createBackup}>{t('立即备份')}</button>
       </div>
       <QueryView query={query}>
         {(data) => (
           <>
             {data.status?.lastError && (
-              <p className="badge danger" style={{ marginTop: 0 }}>最近备份失败：{data.status.lastError}</p>
+              <p className="badge danger" style={{ marginTop: 0 }}>{t('最近备份失败：')}{data.status.lastError}</p>
             )}
             {data.backups.length === 0 ? (
-              <EmptyState icon="🗄️" text="还没有备份" hint="点击“立即备份”创建第一份备份；应用每天也会自动备份一次" />
+              <EmptyState icon="🗄️" text={t('还没有备份')} hint={t('点击“立即备份”创建第一份备份；应用每天也会自动备份一次')} />
             ) : (
               <table className="tbl">
                 <thead>
-                  <tr><th>时间</th><th>类型</th><th>大小</th><th>备注</th><th>长期保留</th><th /></tr>
+                  <tr><th>{t('时间')}</th><th>{t('类型')}</th><th>{t('大小')}</th><th>{t('备注')}</th><th>{t('长期保留')}</th><th /></tr>
                 </thead>
                 <tbody>
                   {data.backups.map((b: any) => (
                     <tr key={b.file}>
                       <td>{fmtDateTime(b.created_at)}</td>
-                      <td><span className="badge">{TYPE_LABEL[b.type] || b.type}</span></td>
+                      <td><span className="badge">{t(TYPE_LABEL[b.type] || b.type)}</span></td>
                       <td>{fmtSize(b.size)}</td>
                       <td>
                         {b.note || <span className="muted">—</span>}{' '}
                         <button className="btn small" onClick={async () => {
-                          const note = window.prompt('备份备注 / 名称', b.note || '');
+                          const note = window.prompt(t('备份备注 / 名称'), b.note || '');
                           if (note !== null) {
                             await apiPatch(`/api/backups/${encodeURIComponent(b.file)}`, { note });
                             refresh();
@@ -130,14 +131,14 @@ function BackupsCard() {
                         <input type="checkbox" checked={b.keep} onChange={async (e) => {
                           await apiPatch(`/api/backups/${encodeURIComponent(b.file)}`, { keep: e.target.checked });
                           refresh();
-                          toast(e.target.checked ? '已标记长期保留，不会被自动清理' : '已取消长期保留');
+                          toast(t(e.target.checked ? '已标记长期保留，不会被自动清理' : '已取消长期保留'));
                         }} />
                       </td>
                       <td>
                         <div className="row">
-                          <button className="btn small" onClick={() => restore(b)}>恢复</button>
+                          <button className="btn small" onClick={() => restore(b)}>{t('恢复')}</button>
                           <button className="btn small danger" onClick={async () => {
-                            if (await confirm({ title: '删除备份', danger: true, body: `确定删除 ${fmtDateTime(b.created_at)} 的备份文件？此操作不可恢复。` })) {
+                            if (await confirm({ title: t('删除备份'), danger: true, body: t('确定删除 {0} 的备份文件？此操作不可恢复。', fmtDateTime(b.created_at)) })) {
                               try {
                                 await apiDelete(`/api/backups/${encodeURIComponent(b.file)}`);
                                 refresh();
@@ -145,7 +146,7 @@ function BackupsCard() {
                                 toast(e instanceof Error ? e.message : String(e), { error: true });
                               }
                             }
-                          }}>删</button>
+                          }}>{t('删')}</button>
                         </div>
                       </td>
                     </tr>
@@ -154,7 +155,7 @@ function BackupsCard() {
               </table>
             )}
             <p className="small muted" style={{ marginBottom: 0 }}>
-              应用每天自动备份一次；普通自动备份最多保留 30 份，勾选“长期保留”的备份不会被清理。
+              {t('应用每天自动备份一次；普通自动备份最多保留 30 份，勾选“长期保留”的备份不会被清理。')}
             </p>
           </>
         )}
@@ -166,12 +167,11 @@ function BackupsCard() {
 function ExportCard() {
   return (
     <div className="card">
-      <h3>导出数据</h3>
+      <h3>{t('导出数据')}</h3>
       <p className="small muted">
-        导出 ZIP 压缩包，内含机读的全量 JSON 和每个模块一份可用表格软件打开的 CSV，用于迁移或人工查看。
-        导出不会修改主数据，也不能替代完整备份。
+        {t('导出 ZIP 压缩包，内含机读的全量 JSON 和每个模块一份可用表格软件打开的 CSV，用于迁移或人工查看。导出不会修改主数据，也不能替代完整备份。')}
       </p>
-      <a className="btn" href="/api/export" download>导出 ZIP（JSON + CSV）</a>
+      <a className="btn" href="/api/export" download>{t('导出 ZIP（JSON + CSV）')}</a>
     </div>
   );
 }
@@ -184,22 +184,22 @@ function TrashCard() {
   return (
     <div className="card">
       <div className="row" style={{ justifyContent: 'space-between', marginBottom: 8 }}>
-        <h3 style={{ margin: 0 }}>回收站</h3>
+        <h3 style={{ margin: 0 }}>{t('回收站')}</h3>
         <button className="btn danger small" onClick={async () => {
-          if (await confirm({ title: '清空回收站', danger: true, confirmText: '永久删除全部', body: '回收站中的所有记录将被永久删除，无法恢复。' })) {
+          if (await confirm({ title: t('清空回收站'), danger: true, confirmText: t('永久删除全部'), body: t('回收站中的所有记录将被永久删除，无法恢复。') })) {
             await apiPost('/api/trash/empty');
             refresh();
-            toast('回收站已清空');
+            toast(t('回收站已清空'));
           }
-        }}>清空回收站</button>
+        }}>{t('清空回收站')}</button>
       </div>
       <QueryView query={query} isEmpty={(d: any) => d.items.length === 0}
-        empty={<p className="small muted" style={{ margin: 0 }}>回收站是空的。删除的记录会先进入这里，可随时恢复。</p>}>
+        empty={<p className="small muted" style={{ margin: 0 }}>{t('回收站是空的。删除的记录会先进入这里，可随时恢复。')}</p>}>
         {(data: any) => (
           <div>
             {data.items.slice(0, 50).map((it: any) => (
               <div className="list-item small" key={it.table + it.id}>
-                <span className="badge">{it.moduleLabel} · {it.label}</span>
+                <span className="badge">{t(it.moduleLabel)} · {t(it.label)}</span>
                 <span className="title">{it.title}</span>
                 <span className="muted">{fmtDateTime(it.deleted_at)}</span>
                 <button className="btn small" onClick={async () => {
@@ -207,14 +207,14 @@ function TrashCard() {
                   refresh();
                   queryClient.invalidateQueries({ queryKey: ['t', it.table] });
                   toast('已恢复');
-                }}>恢复</button>
+                }}>{t('恢复')}</button>
                 <button className="btn small danger" onClick={async () => {
-                  if (await confirm({ title: '永久删除', danger: true, confirmText: '永久删除', body: `永久删除「${it.title}」？此操作无法撤销。` })) {
+                  if (await confirm({ title: t('永久删除'), danger: true, confirmText: t('永久删除'), body: t('永久删除「{0}」？此操作无法撤销。', it.title) })) {
                     await apiDelete(`/api/trash/${it.table}/${it.id}`);
                     refresh();
-                    toast('已永久删除');
+                    toast(t('已永久删除'));
                   }
-                }}>永久删除</button>
+                }}>{t('永久删除')}</button>
               </div>
             ))}
           </div>
@@ -229,7 +229,7 @@ function AppearanceCard() {
   const { toast } = useUI();
   return (
     <div className="card">
-      <h3>界面外观 <span className="sub">只改变界面样式，不影响任何业务数据</span></h3>
+      <h3>{t('界面外观')} <span className="sub">{t('只改变界面样式，不影响任何业务数据')}</span></h3>
       <div className="appearance-grid">
         {APPEARANCES.map((a) => (
           <button
@@ -238,18 +238,18 @@ function AppearanceCard() {
             data-preview={a.key}
             onClick={async () => {
               await update({ appearance: a.key });
-              toast(`已切换为「${a.label}」外观`);
+              toast(t('已切换为「{0}」外观', t(a.label)));
             }}
           >
             <span className="preview">
               <span className="p-dot" /><span className="p-bar" /><span className="p-chip" />
             </span>
-            <strong>{a.label}</strong>
-            <span className="small muted">{a.desc}</span>
+            <strong>{t(a.label)}</strong>
+            <span className="small muted">{t(a.desc)}</span>
           </button>
         ))}
       </div>
-      <p className="small muted" style={{ marginBottom: 0 }}>每种外观都支持下方“主题”里的浅色与深色模式。</p>
+      <p className="small muted" style={{ marginBottom: 0 }}>{t('每种外观都支持下方“主题”里的浅色与深色模式。')}</p>
     </div>
   );
 }
@@ -263,31 +263,40 @@ function PreferencesCard() {
   ];
   return (
     <div className="card">
-      <h3>使用偏好</h3>
+      <h3>{t('使用偏好')}</h3>
       <div className="grid-2">
-        <Field label="主题">
+        <Field label={t('语言 / Language')}>
+          <select className="input" value={settings.language || 'zh'} onChange={async (e) => {
+            await update({ language: e.target.value as 'zh' | 'en' });
+            window.location.reload();
+          }}>
+            <option value="zh">中文</option>
+            <option value="en">English</option>
+          </select>
+        </Field>
+        <Field label={t('主题')}>
           <select className="input" value={settings.theme} onChange={async (e) => {
             await update({ theme: e.target.value as any });
-            toast('主题已更新');
+            toast(t('主题已更新'));
           }}>
-            <option value="auto">跟随系统</option>
-            <option value="light">浅色</option>
-            <option value="dark">深色</option>
+            <option value="auto">{t('跟随系统')}</option>
+            <option value="light">{t('浅色')}</option>
+            <option value="dark">{t('深色')}</option>
           </select>
         </Field>
-        <Field label="每周起始日">
+        <Field label={t('每周起始日')}>
           <select className="input" value={String(settings.week_start)} onChange={async (e) => {
             await update({ week_start: Number(e.target.value) as 0 | 1 });
-            toast('已更新');
+            toast(t('已更新'));
           }}>
-            <option value="1">周一</option>
-            <option value="0">周日</option>
+            <option value="1">{t('周一')}</option>
+            <option value="0">{t('周日')}</option>
           </select>
         </Field>
-        <Field label="日期格式">
+        <Field label={t('日期格式')}>
           <select className="input" value={settings.date_format} onChange={async (e) => {
             await update({ date_format: e.target.value as any });
-            toast('已更新');
+            toast(t('已更新'));
           }}>
             <option value="iso">2026-08-14</option>
             <option value="cn">2026年8月14日</option>
@@ -295,7 +304,7 @@ function PreferencesCard() {
           </select>
         </Field>
       </div>
-      <Field label="首页显示的模块摘要">
+      <Field label={t('首页显示的模块摘要')}>
         <div className="row wrap">
           {MODULES.map(([key, label]) => (
             <label key={key} className="row small" style={{ gap: 4 }}>
@@ -306,7 +315,7 @@ function PreferencesCard() {
                   await update({ home_summaries: { ...settings.home_summaries, [key]: e.target.checked } });
                 }}
               />
-              {label}
+              {t(label)}
             </label>
           ))}
         </div>
@@ -318,7 +327,7 @@ function PreferencesCard() {
 export default function SettingsPage() {
   return (
     <div>
-      <div className="page-head"><h2>数据与设置</h2></div>
+      <div className="page-head"><h2>{t('数据与设置')}</h2></div>
       <DataFileCard />
       <BackupsCard />
       <ExportCard />

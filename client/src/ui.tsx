@@ -1,4 +1,5 @@
 import { UseQueryResult } from '@tanstack/react-query';
+import { fmtMinutesI18n, t } from './i18n';
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 
 // ---- 弹窗 ----
@@ -20,7 +21,7 @@ export function Drawer(props: { title: React.ReactNode; onClose: () => void; chi
       <div className="drawer">
         <div className="row" style={{ justifyContent: 'space-between', marginBottom: 14 }}>
           <h3 style={{ margin: 0 }}>{props.title}</h3>
-          <button className="btn small" onClick={props.onClose}>关闭</button>
+          <button className="btn small" onClick={props.onClose}>{t('关闭')}</button>
         </div>
         {props.children}
       </div>
@@ -74,18 +75,18 @@ export function UIProvider(props: { children: React.ReactNode }) {
     <UIContext.Provider value={{ toast, confirm }}>
       {props.children}
       <div className="toasts">
-        {toasts.map((t) => (
-          <div key={t.id} className={'toast' + (t.error ? ' error' : '')}>
-            <span>{t.message}</span>
-            {t.undo && (
+        {toasts.map((item) => (
+          <div key={item.id} className={'toast' + (item.error ? ' error' : '')}>
+            <span>{item.message}</span>
+            {item.undo && (
               <button
                 className="btn small"
                 onClick={() => {
-                  t.undo!();
-                  setToasts((x) => x.filter((y) => y.id !== t.id));
+                  item.undo!();
+                  setToasts((x) => x.filter((y) => y.id !== item.id));
                 }}
               >
-                撤销
+                {t('撤销')}
               </button>
             )}
           </div>
@@ -95,9 +96,9 @@ export function UIProvider(props: { children: React.ReactNode }) {
         <Modal title={confirmState.title} onClose={() => closeConfirm(false)}>
           {confirmState.body && <div style={{ marginBottom: 16 }}>{confirmState.body}</div>}
           <div className="row" style={{ justifyContent: 'flex-end' }}>
-            <button className="btn" onClick={() => closeConfirm(false)}>取消</button>
+            <button className="btn" onClick={() => closeConfirm(false)}>{t('取消')}</button>
             <button className={'btn ' + (confirmState.danger ? 'danger' : 'primary')} onClick={() => closeConfirm(true)}>
-              {confirmState.confirmText || '确认'}
+              {confirmState.confirmText || t('确认')}
             </button>
           </div>
         </Modal>
@@ -117,7 +118,7 @@ export function QueryView<T>(props: {
   if (query.isLoading) {
     return (
       <div className="state-box">
-        <span className="spinner" /> <span style={{ marginLeft: 8 }}>加载中…</span>
+        <span className="spinner" /> <span style={{ marginLeft: 8 }}>{t('加载中…')}</span>
       </div>
     );
   }
@@ -125,14 +126,14 @@ export function QueryView<T>(props: {
     return (
       <div className="state-box">
         <div className="icon">⚠️</div>
-        <div>加载失败：{query.error instanceof Error ? query.error.message : '未知错误'}</div>
-        <button className="btn" style={{ marginTop: 10 }} onClick={() => query.refetch()}>重试</button>
+        <div>{t('加载失败：')}{query.error instanceof Error ? query.error.message : t('未知错误')}</div>
+        <button className="btn" style={{ marginTop: 10 }} onClick={() => query.refetch()}>{t('重试')}</button>
       </div>
     );
   }
   const data = query.data as T;
   if (props.isEmpty && props.isEmpty(data)) {
-    return <>{props.empty ?? <EmptyState text="暂无数据" />}</>;
+    return <>{props.empty ?? <EmptyState text={t('暂无数据')} />}</>;
   }
   return <>{props.children(data)}</>;
 }
@@ -185,11 +186,7 @@ export function Field(props: { label: string; children: React.ReactNode }) {
 }
 
 export function fmtMinutes(min: number | null | undefined): string {
-  if (!min) return '';
-  if (min < 60) return `${min}分钟`;
-  const h = Math.floor(min / 60);
-  const m = min % 60;
-  return m ? `${h}小时${m}分钟` : `${h}小时`;
+  return fmtMinutesI18n(min);
 }
 
 export function fmtSize(bytes: number): string {

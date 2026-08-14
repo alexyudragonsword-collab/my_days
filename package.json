@@ -10,6 +10,13 @@
   "scripts": {
     "dev": "npm run dev -w server & npm run dev -w client & wait",
     "build": "npm run build -w server && npm run build -w client",
-    "start": "node server/dist/index.js"
+    "start": "node server/dist/index.js",
+    "app:start": "node scripts/start-app.mjs",
+    "test": "node --test tests/server.test.mjs",
+    "test:e2e": "playwright test",
+    "verify": "npm run build && npm test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.62.1"
   }
 }

@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import * as fs from 'fs';
+import JSZip from 'jszip';
 import { createBackup, deleteBackup, getBackupStatus, listBackups, restoreBackup, updateBackupMeta } from './backup';
 import { DB_PATH, getDb, now } from './db';
 import { SOURCE_TABLES, TABLES, tableByName } from './tables';
@@ -167,17 +168,46 @@ api.post('/trash/empty', (_req, res) => {
   res.json({ ok: true });
 });
 
-// ---- 导出（不修改主数据） ----
-api.get('/export', (_req, res) => {
-  const db = getDb();
-  const data: Record<string, unknown> = { exported_at: now(), app: 'my_days', version: 1 };
-  for (const def of TABLES) {
-    data[def.name] = db.prepare(`SELECT * FROM ${def.name} WHERE deleted_at IS NULL`).all();
-  }
-  const settings = db.prepare('SELECT key, value FROM settings').all();
-  data['settings'] = settings;
-  res.setHeader('Content-Disposition', `attachment; filename="my_days-export-${new Date().toISOString().slice(0, 10)}.json"`);
-  res.json(data);
+// ---- 导出（不修改主数据）：ZIP 包含清单、全量 JSON 和每表 CSV ----
+function toCsv(columns: string[], rows: any[]): string {
+  const escape = (v: unknown): string => {
+    if (v === null || v === undefined) return '';
+    const s = String(v);
+    return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  };
+  const lines = [columns.join(',')];
+  for (const r of rows) lines.push(columns.map((c) => escape(r[c])).join(','));
+  return '﻿' + lines.join('\r\n');
+}
+
+api.get('/export', (_req, res, next) => {
+  (async () => {
+    const db = getDb();
+    const zip = new JSZip();
+    const schemaVersion = db
+      .prepare('SELECT version FROM schema_migrations ORDER BY version DESC LIMIT 1')
+      .get() as { version: string } | undefined;
+    zip.file('manifest.json', JSON.stringify({
+      app: 'my_days',
+      exported_at: now(),
+      format_version: 1,
+      schema_version: schemaVersion?.version || null,
+    }, null, 2));
+    const data: Record<string, unknown> = {};
+    const csv = zip.folder('csv')!;
+    for (const def of TABLES) {
+      const rows = db.prepare(`SELECT * FROM ${def.name} WHERE deleted_at IS NULL`).all() as any[];
+      data[def.name] = rows;
+      const columns = ['id', ...def.columns, 'created_at', 'updated_at'];
+      csv.file(`${def.name}.csv`, toCsv(columns, rows));
+    }
+    data['settings'] = db.prepare('SELECT key, value FROM settings').all();
+    zip.file('all-data.json', JSON.stringify(data, null, 2));
+    const buffer = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="my_days-export-${new Date().toISOString().slice(0, 10)}.zip"`);
+    res.send(buffer);
+  })().catch(next);
 });
 
 // ---- 备份 ----

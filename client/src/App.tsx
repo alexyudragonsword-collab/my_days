@@ -113,7 +113,8 @@ function SearchPalette(props: { onClose: () => void }) {
 
 function TopBar(props: { onSearch: () => void; onQuickAdd: () => void }) {
   const { fmtDate } = useSettings();
-  const { toast } = useUI();
+  const { toast, confirm } = useUI();
+  const [exited, setExited] = useState(false);
   const [saveState, setSaveState] = useState<SaveState>('idle');
   const [saveError, setSaveError] = useState('');
   useEffect(() => onSaveState((s, err) => { setSaveState(s); setSaveError(err || ''); }), []);
@@ -136,6 +137,31 @@ function TopBar(props: { onSearch: () => void; onQuickAdd: () => void }) {
       toast('保存失败：' + (e instanceof Error ? e.message : e), { error: true });
     }
   };
+
+  const saveAndExit = async () => {
+    const ok = await confirm({
+      title: '保存并退出',
+      body: '将提交所有草稿并把数据写入本地文件，然后关闭后台服务。下次使用时重新运行启动文件即可。',
+      confirmText: '保存并退出',
+    });
+    if (!ok) return;
+    window.dispatchEvent(new CustomEvent('my-days:flush-drafts'));
+    await new Promise((r) => setTimeout(r, 200));
+    try {
+      await apiPost('/api/system/exit');
+      setExited(true);
+    } catch (e) {
+      toast('退出失败：' + (e instanceof Error ? e.message : e), { error: true });
+    }
+  };
+
+  if (exited) {
+    return (
+      <div className="topbar">
+        <span className="badge ok">数据已安全保存，后台服务已退出，可以关闭此页面</span>
+      </div>
+    );
+  }
 
   const saveBadge = {
     idle: null,
@@ -160,6 +186,7 @@ function TopBar(props: { onSearch: () => void; onQuickAdd: () => void }) {
         </span>
       ) : null}
       <button className="btn" onClick={manualSave} title="立即提交草稿并把数据写入本地数据文件">手动保存</button>
+      <button className="btn" onClick={saveAndExit} title="保存全部数据并关闭本地后台服务">保存并退出</button>
       <button className="btn primary" onClick={props.onQuickAdd}>＋ 快速新增</button>
     </div>
   );

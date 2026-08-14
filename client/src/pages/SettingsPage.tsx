@@ -26,6 +26,15 @@ function DataFileCard() {
           )
         }
       </QueryView>
+      <div className="row" style={{ marginTop: 8 }}>
+        <button className="btn small" onClick={async () => {
+          try {
+            await apiPost('/api/system/open-data-dir');
+          } catch {
+            /* 无桌面环境时按钮无效果，路径已在上方展示 */
+          }
+        }}>打开数据目录</button>
+      </div>
       <p className="small muted" style={{ marginBottom: 0 }}>
         所有业务数据都保存在上述 SQLite 文件中，可直接在文件系统中复制该文件做额外备份。
       </p>
@@ -159,9 +168,10 @@ function ExportCard() {
     <div className="card">
       <h3>导出数据</h3>
       <p className="small muted">
-        导出全部核心业务记录为 JSON 文件，用于迁移或人工查看。导出不会修改主数据，也不能替代完整备份。
+        导出 ZIP 压缩包，内含机读的全量 JSON 和每个模块一份可用表格软件打开的 CSV，用于迁移或人工查看。
+        导出不会修改主数据，也不能替代完整备份。
       </p>
-      <a className="btn" href="/api/export" download>导出 JSON</a>
+      <a className="btn" href="/api/export" download>导出 ZIP（JSON + CSV）</a>
     </div>
   );
 }

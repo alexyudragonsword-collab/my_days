@@ -1,6 +1,6 @@
 # 验收标准覆盖表
 
-本表把 PRD 中的验收标准 AC-001 至 AC-040 映射到可重复执行的检查。
+本表把 [`PRD.md`](../PRD.md) 第 9 节的验收标准 AC-001 至 AC-040 映射到可重复执行的检查。
 
 - **服务端集成测试**：`npm run verify`（构建 + `tests/server.test.mjs`，针对真实构建产物启动服务）
 - **浏览器端到端测试**：`npm run test:e2e`（`tests/e2e/acceptance.spec.ts`，每次使用全新数据目录）

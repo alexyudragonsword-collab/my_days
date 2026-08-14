@@ -1,4 +1,5 @@
 import { QueryClient } from '@tanstack/react-query';
+import { serverErrorMessage } from './i18n';
 
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -37,7 +38,7 @@ async function request<T>(method: string, url: string, body?: unknown): Promise<
       let msg = `请求失败（${res.status}）`;
       try {
         const data = await res.json();
-        if (data?.error) msg = data.error;
+        msg = serverErrorMessage(data?.code, data?.detail) || data?.error || msg;
       } catch {
         /* 保留默认错误信息 */
       }
@@ -91,6 +92,12 @@ export function updateRow<T = Row>(table: string, id: number, data: Record<strin
 
 export function deleteRow(table: string, id: number) {
   return apiDelete<{ ok: boolean; trash: { table: string; id: number } }>(`/api/t/${table}/${id}`);
+}
+
+/** 彻底删除（软删除后立即从回收站清除），用于模板动作等派生数据，避免污染回收站 */
+export async function hardDeleteRow(table: string, id: number) {
+  await deleteRow(table, id);
+  await apiDelete(`/api/trash/${table}/${id}`);
 }
 
 export function restoreFromTrash(table: string, id: number) {

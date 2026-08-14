@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import express, { Router } from 'express';
 import * as fs from 'fs';
 import JSZip from 'jszip';
 import { createBackup, deleteBackup, getBackupStatus, listBackups, restoreBackup, updateBackupMeta } from './backup';
@@ -77,7 +77,7 @@ api.post('/save', (_req, res) => {
   db.pragma('wal_checkpoint(TRUNCATE)');
   const check = db.pragma('quick_check', { simple: true });
   if (check !== 'ok') {
-    res.status(500).json({ ok: false, error: `数据完整性检查失败：${check}` });
+    res.status(500).json({ ok: false, error: `数据完整性检查失败：${check}`, code: 'INTEGRITY_FAIL', detail: String(check) });
     return;
   }
   res.json({ ok: true, checkedAt: now() });
@@ -143,7 +143,7 @@ api.get('/trash', (_req, res) => {
 api.post('/trash/restore', (req, res) => {
   const { table, id } = req.body || {};
   if (!tableByName.has(table)) {
-    res.status(400).json({ error: '未知数据表' });
+    res.status(400).json({ error: '未知数据表', code: 'UNKNOWN_TABLE' });
     return;
   }
   getDb().prepare(`UPDATE ${table} SET deleted_at = NULL, updated_at = ? WHERE id = ?`).run(now(), id);
@@ -153,7 +153,7 @@ api.post('/trash/restore', (req, res) => {
 api.delete('/trash/:table/:id', (req, res) => {
   const { table, id } = req.params;
   if (!tableByName.has(table)) {
-    res.status(400).json({ error: '未知数据表' });
+    res.status(400).json({ error: '未知数据表', code: 'UNKNOWN_TABLE' });
     return;
   }
   getDb().prepare(`DELETE FROM ${table} WHERE id = ? AND deleted_at IS NOT NULL`).run(id);
@@ -210,6 +210,63 @@ api.get('/export', (_req, res, next) => {
   })().catch(next);
 });
 
+
+// ---- 导入：从导出的 ZIP 完整替换业务数据（先自动创建安全备份） ----
+api.post('/import', express.raw({ type: ['application/zip', 'application/octet-stream'], limit: '200mb' }), (req, res, next) => {
+  (async () => {
+    if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
+      res.status(400).json({ error: '导入文件无效', code: 'IMPORT_INVALID' });
+      return;
+    }
+    let manifest: any;
+    let data: Record<string, any>;
+    try {
+      const zip = await JSZip.loadAsync(req.body);
+      manifest = JSON.parse(await zip.file('manifest.json')!.async('string'));
+      data = JSON.parse(await zip.file('all-data.json')!.async('string'));
+    } catch {
+      res.status(400).json({ error: '导入文件无效', code: 'IMPORT_INVALID' });
+      return;
+    }
+    if (manifest?.app !== 'my_days' || manifest?.format_version !== 1) {
+      res.status(400).json({ error: '导入文件无效', code: 'IMPORT_INVALID' });
+      return;
+    }
+    const db = getDb();
+    const current = db.prepare('SELECT version FROM schema_migrations ORDER BY version DESC LIMIT 1').get() as { version: string } | undefined;
+    if (manifest.schema_version && current && String(manifest.schema_version) > current.version) {
+      res.status(400).json({ error: '导入数据来自更新版本，请先升级应用', code: 'IMPORT_NEWER_SCHEMA' });
+      return;
+    }
+    // 覆盖前先创建当前数据的安全备份
+    const safety = createBackup('safety', 'before-import');
+    let imported = 0;
+    const tx = db.transaction(() => {
+      for (const def of TABLES) {
+        db.prepare(`DELETE FROM ${def.name}`).run();
+        const rows: any[] = Array.isArray(data[def.name]) ? data[def.name] : [];
+        if (rows.length === 0) continue;
+        const columns = ['id', ...def.columns, 'created_at', 'updated_at'];
+        const insert = db.prepare(
+          `INSERT INTO ${def.name} (${columns.join(', ')}) VALUES (${columns.map(() => '?').join(', ')})`
+        );
+        for (const row of rows) {
+          insert.run(...columns.map((c) => (c === 'created_at' || c === 'updated_at' ? row[c] ?? now() : row[c] ?? null)));
+          imported++;
+        }
+      }
+      db.prepare('DELETE FROM settings').run();
+      const putSetting = db.prepare('INSERT INTO settings(key, value) VALUES (?, ?)');
+      for (const s of Array.isArray(data['settings']) ? data['settings'] : []) {
+        if (s?.key) putSetting.run(String(s.key), String(s.value ?? ''));
+      }
+    });
+    tx();
+    db.pragma('wal_checkpoint(TRUNCATE)');
+    res.json({ ok: true, imported, safetyBackup: safety.file });
+  })().catch(next);
+});
+
 // ---- 备份 ----
 api.get('/backups', (_req, res) => {
   res.json({ backups: listBackups(), status: getBackupStatus() });
@@ -231,7 +288,7 @@ api.patch('/backups/:file', (req, res) => {
 api.delete('/backups/:file', (req, res) => {
   const b = listBackups().find((x) => x.file === req.params.file);
   if (b?.keep) {
-    res.status(400).json({ error: '该备份已标记长期保留，请先取消标记' });
+    res.status(400).json({ error: '该备份已标记长期保留，请先取消标记', code: 'BACKUP_KEPT' });
     return;
   }
   deleteBackup(req.params.file);
@@ -247,7 +304,7 @@ api.post('/backups/:file/restore', (req, res) => {
 api.get('/t/:table', (req, res) => {
   const def = tableByName.get(req.params.table);
   if (!def) {
-    res.status(404).json({ error: '未知数据表' });
+    res.status(404).json({ error: '未知数据表', code: 'UNKNOWN_TABLE' });
     return;
   }
   const clauses = ['deleted_at IS NULL'];
@@ -258,6 +315,11 @@ api.get('/t/:table', (req, res) => {
       clauses.push(`${col} = ?`);
       params.push(v);
     }
+  }
+  // since：按创建时间过滤（供首页等场景限定拉取范围）
+  if (req.query.since) {
+    clauses.push('created_at >= ?');
+    params.push(req.query.since);
   }
   // 特殊过滤：date_from / date_to 作用于 date 列
   if (def.columns.includes('date')) {
@@ -280,12 +342,12 @@ api.get('/t/:table', (req, res) => {
 api.get('/t/:table/:id', (req, res) => {
   const def = tableByName.get(req.params.table);
   if (!def) {
-    res.status(404).json({ error: '未知数据表' });
+    res.status(404).json({ error: '未知数据表', code: 'UNKNOWN_TABLE' });
     return;
   }
   let row = getDb().prepare(`SELECT * FROM ${def.name} WHERE id = ? AND deleted_at IS NULL`).get(req.params.id) as any;
   if (!row) {
-    res.status(404).json({ error: '记录不存在' });
+    res.status(404).json({ error: '记录不存在', code: 'NOT_FOUND' });
     return;
   }
   if (def.name === 'plan_items') row = resolveSource(row);
@@ -295,7 +357,7 @@ api.get('/t/:table/:id', (req, res) => {
 api.post('/t/:table', (req, res) => {
   const def = tableByName.get(req.params.table);
   if (!def) {
-    res.status(404).json({ error: '未知数据表' });
+    res.status(404).json({ error: '未知数据表', code: 'UNKNOWN_TABLE' });
     return;
   }
   const data = pickColumns(def.name, req.body || {});
@@ -311,19 +373,19 @@ api.post('/t/:table', (req, res) => {
 api.patch('/t/:table/:id', (req, res) => {
   const def = tableByName.get(req.params.table);
   if (!def) {
-    res.status(404).json({ error: '未知数据表' });
+    res.status(404).json({ error: '未知数据表', code: 'UNKNOWN_TABLE' });
     return;
   }
   const data = pickColumns(def.name, req.body || {});
   const cols = Object.keys(data);
   if (cols.length === 0) {
-    res.status(400).json({ error: '没有可更新的字段' });
+    res.status(400).json({ error: '没有可更新的字段', code: 'NO_FIELDS' });
     return;
   }
   const sql = `UPDATE ${def.name} SET ${cols.map((c) => `${c} = ?`).join(', ')}, updated_at = ? WHERE id = ? AND deleted_at IS NULL`;
   const info = getDb().prepare(sql).run(...cols.map((c) => data[c] ?? null), now(), req.params.id);
   if (info.changes === 0) {
-    res.status(404).json({ error: '记录不存在' });
+    res.status(404).json({ error: '记录不存在', code: 'NOT_FOUND' });
     return;
   }
   const row = getDb().prepare(`SELECT * FROM ${def.name} WHERE id = ?`).get(req.params.id);
@@ -334,14 +396,14 @@ api.patch('/t/:table/:id', (req, res) => {
 api.delete('/t/:table/:id', (req, res) => {
   const def = tableByName.get(req.params.table);
   if (!def) {
-    res.status(404).json({ error: '未知数据表' });
+    res.status(404).json({ error: '未知数据表', code: 'UNKNOWN_TABLE' });
     return;
   }
   const info = getDb()
     .prepare(`UPDATE ${def.name} SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL`)
     .run(now(), now(), req.params.id);
   if (info.changes === 0) {
-    res.status(404).json({ error: '记录不存在' });
+    res.status(404).json({ error: '记录不存在', code: 'NOT_FOUND' });
     return;
   }
   res.json({ ok: true, trash: { table: def.name, id: Number(req.params.id) } });

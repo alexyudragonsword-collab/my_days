@@ -1,0 +1,15 @@
+{
+  "name": "my-days",
+  "version": "1.0.0",
+  "private": true,
+  "description": "个人工作生活管理 App（本地单机版）",
+  "workspaces": [
+    "server",
+    "client"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w server & npm run dev -w client & wait",
+    "build": "npm run build -w server && npm run build -w client",
+    "start": "node server/dist/index.js"
+  }
+}

@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { createRow, deleteRow, invalidateTable, listRows, queryClient, restoreFromTrash, Row, todayStr, updateRow } from './api';
+import { t } from './i18n';
 import { useUI } from './ui';
 
 /** 查询某张表（带过滤），queryKey 统一为 ['t', table, filters] 便于失效 */
@@ -19,7 +20,7 @@ export function useSoftDelete() {
     await deleteRow(table, id);
     invalidateTable(table);
     queryClient.invalidateQueries({ queryKey: ['trash'] });
-    toast(`${label}已移入回收站`, {
+    toast(t('{0}已移入回收站', t(label)), {
       undo: async () => {
         await restoreFromTrash(table, id);
         invalidateTable(table);
@@ -41,7 +42,7 @@ export function useAddToPlan() {
       source_id: opts.sourceId,
     });
     invalidateTable('plan_items');
-    toast('已加入今日计划');
+    toast(t('已加入今日计划'));
   };
 }
 
@@ -86,17 +87,17 @@ export function usePlanItemActions() {
     if (status !== '已完成') return;
     const sync = item.source_module ? SOURCE_SYNC[String(item.source_module)] : undefined;
     if (sync && item.source_id) {
-      const yes = await confirm({ title: '事项已完成', body: sync.ask, confirmText: '同步完成' });
+      const yes = await confirm({ title: t('事项已完成'), body: t(sync.ask), confirmText: t('同步完成') });
       if (yes) {
         try {
           await sync.run(Number(item.source_id));
-          toast(sync.done);
+          toast(t(sync.done));
         } catch (e) {
-          toast('来源记录同步失败：' + (e instanceof Error ? e.message : e), { error: true });
+          toast(t('来源记录同步失败：') + (e instanceof Error ? e.message : e), { error: true });
         }
       }
     } else {
-      toast('已完成 🎉');
+      toast(t('已完成 🎉'));
     }
   };
 
@@ -114,7 +115,7 @@ export function usePlanItemActions() {
       note: item.note ?? null,
     });
     invalidateTable('plan_items');
-    toast(`已延期到 ${toDate}`);
+    toast(t('已延期到 {0}', toDate));
   };
 
   return { setStatus, postpone };

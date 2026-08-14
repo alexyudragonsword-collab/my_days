@@ -2,11 +2,12 @@ import React, { useEffect, useState } from 'react';
 import { createRow, invalidateTable, Row, todayStr, updateRow } from '../api';
 import { useAddToPlan, useClearOpenParam, useOpenParam, useSoftDelete, useTable } from '../hooks';
 import { useSettings } from '../settings';
+import { t, weekdayCharLabel } from '../i18n';
 import { Drawer, Dropdown, EmptyState, Field, Modal, QueryView, useUI } from '../ui';
 
 function TrendSvg(props: { points: { label: string; value: number }[]; unit?: string; color?: string }) {
   const pts = props.points;
-  if (pts.length < 2) return <p className="small muted">数据不足两条，暂无法绘制趋势</p>;
+  if (pts.length < 2) return <p className="small muted">{t('数据不足两条，暂无法绘制趋势')}</p>;
   const w = 320, h = 100, pad = 6;
   const values = pts.map((p) => p.value);
   const min = Math.min(...values), max = Math.max(...values);
@@ -26,7 +27,7 @@ function TrendSvg(props: { points: { label: string; value: number }[]; unit?: st
       </svg>
       <div className="row small muted" style={{ justifyContent: 'space-between' }}>
         <span>{pts[0].label}</span>
-        <span>最新 {pts[pts.length - 1].value}{props.unit || ''}</span>
+        <span>{t('最新')} {pts[pts.length - 1].value}{props.unit || ''}</span>
       </div>
     </div>
   );
@@ -36,13 +37,13 @@ interface ExerciseDraft { name: string; target_sets: string; target_reps: string
 const emptyExercise = (): ExerciseDraft => ({ name: '', target_sets: '3', target_reps: '10', target_weight: '', rest_sec: '90' });
 
 function TemplateEditor(props: { template?: Row; exercises: Row[]; onClose: () => void }) {
-  const t = props.template;
-  const [name, setName] = useState(String(t?.name || ''));
-  const [weekdays, setWeekdays] = useState<string[]>(String(t?.weekdays || '').split(',').filter(Boolean));
+  const tpl = props.template;
+  const [name, setName] = useState(String(tpl?.name || ''));
+  const [weekdays, setWeekdays] = useState<string[]>(String(tpl?.weekdays || '').split(',').filter(Boolean));
   const [rows, setRows] = useState<ExerciseDraft[]>(
-    t
+    tpl
       ? props.exercises
-          .filter((e) => Number(e.template_id) === t.id)
+          .filter((e) => Number(e.template_id) === tpl.id)
           .sort((a, b) => Number(a.sort) - Number(b.sort))
           .map((e) => ({
             name: String(e.name),
@@ -57,13 +58,13 @@ function TemplateEditor(props: { template?: Row; exercises: Row[]; onClose: () =
   const WEEKDAYS = ['一', '二', '三', '四', '五', '六', '日'];
 
   const save = async () => {
-    if (!name.trim()) { toast('请填写模板名称', { error: true }); return; }
+    if (!name.trim()) { toast(t('请填写模板名称'), { error: true }); return; }
     let templateId: number;
-    if (t) {
-      await updateRow('fitness_templates', t.id, { name: name.trim(), weekdays: weekdays.join(',') });
-      templateId = t.id;
+    if (tpl) {
+      await updateRow('fitness_templates', tpl.id, { name: name.trim(), weekdays: weekdays.join(',') });
+      templateId = tpl.id;
       // 简化处理：编辑时重建动作列表
-      for (const e of props.exercises.filter((e) => Number(e.template_id) === t.id)) {
+      for (const e of props.exercises.filter((e) => Number(e.template_id) === tpl.id)) {
         await updateRow('fitness_template_exercises', e.id, { template_id: null });
       }
     } else {
@@ -84,16 +85,16 @@ function TemplateEditor(props: { template?: Row; exercises: Row[]; onClose: () =
       });
     }
     invalidateTable('fitness_templates', 'fitness_template_exercises');
-    toast('模板已保存');
+    toast(t('模板已保存'));
     props.onClose();
   };
 
   return (
-    <Modal title={t ? '编辑训练模板' : '新建训练模板'} onClose={props.onClose} width={640}>
-      <Field label="模板名称">
-        <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="例如：推力日 / 腿部训练" />
+    <Modal title={tpl ? t('编辑训练模板') : t('新建训练模板')} onClose={props.onClose} width={640}>
+      <Field label={t('模板名称')}>
+        <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder={t('例如：推力日 / 腿部训练')} />
       </Field>
-      <Field label="计划星期">
+      <Field label={t('计划星期')}>
         <div className="row wrap">
           {WEEKDAYS.map((d) => (
             <label key={d} className="row small" style={{ gap: 4 }}>
@@ -102,34 +103,34 @@ function TemplateEditor(props: { template?: Row; exercises: Row[]; onClose: () =
                 checked={weekdays.includes(d)}
                 onChange={(e) => setWeekdays((w) => (e.target.checked ? [...w, d] : w.filter((x) => x !== d)))}
               />
-              周{d}
+              {weekdayCharLabel(d)}
             </label>
           ))}
         </div>
       </Field>
-      <Field label="动作（名称 / 组数 / 次数 / 重量kg / 休息秒）">
+      <Field label={t('动作（名称 / 组数 / 次数 / 重量kg / 休息秒）')}>
         <div>
           {rows.map((r, i) => (
             <div className="row" key={i} style={{ marginBottom: 6 }}>
-              <input className="input" style={{ flex: 2 }} placeholder="动作名称" value={r.name}
+              <input className="input" style={{ flex: 2 }} placeholder={t('动作名称')} value={r.name}
                 onChange={(e) => setRows((x) => x.map((y, j) => (j === i ? { ...y, name: e.target.value } : y)))} />
-              <input className="input" style={{ width: 60 }} type="number" placeholder="组" value={r.target_sets}
+              <input className="input" style={{ width: 60 }} type="number" placeholder={t('组')} value={r.target_sets}
                 onChange={(e) => setRows((x) => x.map((y, j) => (j === i ? { ...y, target_sets: e.target.value } : y)))} />
-              <input className="input" style={{ width: 60 }} type="number" placeholder="次" value={r.target_reps}
+              <input className="input" style={{ width: 60 }} type="number" placeholder={t('次')} value={r.target_reps}
                 onChange={(e) => setRows((x) => x.map((y, j) => (j === i ? { ...y, target_reps: e.target.value } : y)))} />
               <input className="input" style={{ width: 70 }} type="number" placeholder="kg" value={r.target_weight}
                 onChange={(e) => setRows((x) => x.map((y, j) => (j === i ? { ...y, target_weight: e.target.value } : y)))} />
-              <input className="input" style={{ width: 70 }} type="number" placeholder="休息" value={r.rest_sec}
+              <input className="input" style={{ width: 70 }} type="number" placeholder={t('休息')} value={r.rest_sec}
                 onChange={(e) => setRows((x) => x.map((y, j) => (j === i ? { ...y, rest_sec: e.target.value } : y)))} />
               <button className="btn small" onClick={() => setRows((x) => x.filter((_, j) => j !== i))}>✕</button>
             </div>
           ))}
-          <button className="btn small" onClick={() => setRows((x) => [...x, emptyExercise()])}>＋ 添加动作</button>
+          <button className="btn small" onClick={() => setRows((x) => [...x, emptyExercise()])}>＋ {t('添加动作')}</button>
         </div>
       </Field>
       <div className="row" style={{ justifyContent: 'flex-end' }}>
-        <button className="btn" onClick={props.onClose}>取消</button>
-        <button className="btn primary" onClick={save}>保存模板</button>
+        <button className="btn" onClick={props.onClose}>{t('取消')}</button>
+        <button className="btn primary" onClick={save}>{t('保存模板')}</button>
       </div>
     </Modal>
   );
@@ -149,9 +150,9 @@ function SessionDetail(props: { session: Row; onClose: () => void }) {
     const prev = allSets
       .filter((x) => Number(x.session_id) !== s.id && String(x.exercise_name) === exercise && x.done)
       .sort((a, b) => b.id - a.id);
-    if (prev.length === 0) return '首次记录该动作';
+    if (prev.length === 0) return t('首次记录该动作');
     const bySession = prev.filter((x) => x.session_id === prev[0].session_id);
-    return '上次：' + bySession.reverse().map((x) => `${x.reps ?? '?'}次×${x.weight ?? '?'}kg`).join('，');
+    return t('上次：') + bySession.reverse().map((x) => t('{0}次×{1}kg', String(x.reps ?? '?'), String(x.weight ?? '?'))).join(t('，'));
   };
 
   const recordSet = async (set: Row, reps: string, weight: string) => {
@@ -168,13 +169,13 @@ function SessionDetail(props: { session: Row; onClose: () => void }) {
     const volume = doneSets.reduce((sum, x) => sum + (Number(x.reps) || 0) * (Number(x.weight) || 0), 0);
     await updateRow('fitness_sessions', s.id, { status: '已完成', notes: notes || null });
     invalidateTable('fitness_sessions');
-    toast(`训练完成！共 ${doneSets.length} 组，总容量 ${Math.round(volume)} kg 🎉`);
+    toast(t('训练完成！共 {0} 组，总容量 {1} kg 🎉', doneSets.length, Math.round(volume)));
     props.onClose();
   };
 
   return (
     <Drawer title={`${s.name || '训练'} · ${s.date}`} onClose={props.onClose}>
-      <p className="small muted">状态：{String(s.status)}。逐组填写实际次数和重量后点击 ✓。</p>
+      <p className="small muted">{t('状态：')}{t(String(s.status))}{t('。逐组填写实际次数和重量后点击 ✓。')}</p>
       {exercises.map((ex) => (
         <div key={ex} style={{ marginBottom: 14 }}>
           <div className="row" style={{ justifyContent: 'space-between' }}>
@@ -186,7 +187,7 @@ function SessionDetail(props: { session: Row; onClose: () => void }) {
           ))}
         </div>
       ))}
-      <Field label="训练感受 / 备注">
+      <Field label={t('训练感受 / 备注')}>
         <textarea className="input" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
       </Field>
       <div className="row" style={{ justifyContent: 'flex-end' }}>
@@ -194,9 +195,9 @@ function SessionDetail(props: { session: Row; onClose: () => void }) {
           <button className="btn" onClick={async () => {
             await updateRow('fitness_sessions', s.id, { status: '进行中' });
             invalidateTable('fitness_sessions');
-          }}>标记进行中</button>
+          }}>{t('标记进行中')}</button>
         )}
-        <button className="btn primary" onClick={finish}>完成训练</button>
+        <button className="btn primary" onClick={finish}>{t('完成训练')}</button>
       </div>
     </Drawer>
   );
@@ -208,15 +209,15 @@ function SetRow(props: { set: Row; onRecord: (set: Row, reps: string, weight: st
   const [weight, setWeight] = useState(set.weight == null ? String(set.target_weight ?? '') : String(set.weight));
   return (
     <div className="row small" style={{ marginTop: 4 }}>
-      <span style={{ width: 50 }} className="muted">第{String(set.set_no)}组</span>
-      <input className="input" style={{ width: 70 }} type="number" placeholder="次数" value={reps} onChange={(e) => setReps(e.target.value)} />
-      <span className="muted">次 ×</span>
+      <span style={{ width: 50 }} className="muted">{t('第{0}组', String(set.set_no))}</span>
+      <input className="input" style={{ width: 70 }} type="number" placeholder={t('次数')} value={reps} onChange={(e) => setReps(e.target.value)} />
+      <span className="muted">{t('次')} ×</span>
       <input className="input" style={{ width: 70 }} type="number" placeholder="kg" value={weight} onChange={(e) => setWeight(e.target.value)} />
       <span className="muted">kg</span>
       <button
         className={'btn small' + (set.done ? ' primary' : '')}
         onClick={() => props.onRecord(set, reps, weight)}
-        title={set.done ? '已记录，点击更新' : '记录本组'}
+        title={set.done ? t('已记录，点击更新') : t('记录本组')}
       >✓</button>
     </div>
   );
@@ -239,16 +240,16 @@ function BodyMetricsCard() {
     });
     invalidateTable('body_metrics');
     setWeight(''); setMeasurements('');
-    toast('身体数据已记录');
+    toast(t('身体数据已记录'));
   };
 
   return (
     <div className="card">
-      <h3>身体数据</h3>
+      <h3>{t('身体数据')}</h3>
       <div className="row wrap" style={{ marginBottom: 8 }}>
-        <input className="input" style={{ width: 110 }} type="number" placeholder="体重 kg" value={weight} onChange={(e) => setWeight(e.target.value)} />
-        <input className="input" style={{ flex: 1, minWidth: 140 }} placeholder="围度等（如 腰围82cm）" value={measurements} onChange={(e) => setMeasurements(e.target.value)} />
-        <button className="btn primary" onClick={add}>记录</button>
+        <input className="input" style={{ width: 110 }} type="number" placeholder={t('体重 kg')} value={weight} onChange={(e) => setWeight(e.target.value)} />
+        <input className="input" style={{ flex: 1, minWidth: 140 }} placeholder={t('围度等（如 腰围82cm）')} value={measurements} onChange={(e) => setMeasurements(e.target.value)} />
+        <button className="btn primary" onClick={add}>{t('记录')}</button>
       </div>
       <TrendSvg
         points={rows.filter((r) => r.weight != null).slice(-20).map((r) => ({ label: String(r.date), value: Number(r.weight) }))}
@@ -316,9 +317,9 @@ export default function FitnessPage() {
     invalidateTable('fitness_sessions', 'fitness_session_sets');
     if (begin) {
       setActiveSession(session);
-      toast('训练开始，加油！');
+      toast(t('训练开始，加油！'));
     } else {
-      toast(`已安排到 ${date}`);
+      toast(t('已安排到 {0}', date));
     }
   };
 
@@ -332,42 +333,42 @@ export default function FitnessPage() {
   return (
     <div>
       <div className="page-head">
-        <h2>健身计划</h2>
-        <button className="btn primary" onClick={() => setEditingTemplate('new')}>＋ 新建训练模板</button>
+        <h2>{t('健身计划')}</h2>
+        <button className="btn primary" onClick={() => setEditingTemplate('new')}>＋ {t('新建训练模板')}</button>
       </div>
 
       <div className="card">
-        <h3>训练模板</h3>
+        <h3>{t('训练模板')}</h3>
         <QueryView
           query={templatesQuery}
           isEmpty={(rows) => rows.length === 0}
-          empty={<EmptyState icon="💪" text="还没有训练模板" hint="先建一个模板（例如“推力日”），之后可以一键开始训练"
-            action={<button className="btn primary" onClick={() => setEditingTemplate('new')}>新建模板</button>} />}
+          empty={<EmptyState icon="💪" text={t('还没有训练模板')} hint={t('先建一个模板（例如“推力日”），之后可以一键开始训练')}
+            action={<button className="btn primary" onClick={() => setEditingTemplate('new')}>{t('新建模板')}</button>} />}
         >
           {(rows) => (
             <>
-              {rows.map((t) => {
-                const exs = (exercisesQuery.data || []).filter((e) => Number(e.template_id) === t.id);
+              {rows.map((tpl) => {
+                const exs = (exercisesQuery.data || []).filter((e) => Number(e.template_id) === tpl.id);
                 return (
-                  <div className="list-item" key={t.id}>
+                  <div className="list-item" key={tpl.id}>
                     <span className="title">
-                      {String(t.name)}
+                      {String(tpl.name)}
                       <span className="small muted">
-                        {t.weekdays ? `（周${String(t.weekdays).split(',').join('、周')}）` : ''} · {exs.length} 个动作
+                        {tpl.weekdays ? `（${String(tpl.weekdays).split(',').map(weekdayCharLabel).join(t('、'))}）` : ''} · {t('{0} 个动作', exs.length)}
                       </span>
                     </span>
-                    <button className="btn small primary" onClick={() => startFromTemplate(t, todayStr(), true)}>开始训练</button>
+                    <button className="btn small primary" onClick={() => startFromTemplate(tpl, todayStr(), true)}>{t('开始训练')}</button>
                     <Dropdown>
-                      <button onClick={() => setEditingTemplate(t)}>编辑模板</button>
-                      <button onClick={() => startFromTemplate(t, todayStr(), false)}>安排到今天</button>
+                      <button onClick={() => setEditingTemplate(tpl)}>{t('编辑模板')}</button>
+                      <button onClick={() => startFromTemplate(tpl, todayStr(), false)}>{t('安排到今天')}</button>
                       <button onClick={() => {
-                        const d = window.prompt('安排到哪一天？（YYYY-MM-DD）', todayStr());
-                        if (d && /^\d{4}-\d{2}-\d{2}$/.test(d)) startFromTemplate(t, d, false);
-                      }}>安排到指定日期…</button>
-                      <button onClick={() => addToPlan({ title: `训练：${t.name}`, sourceModule: 'fitness_template', sourceId: t.id })}>
-                        加入今日计划
+                        const d = window.prompt(t('安排到哪一天？（YYYY-MM-DD）'), todayStr());
+                        if (d && /^\d{4}-\d{2}-\d{2}$/.test(d)) startFromTemplate(tpl, d, false);
+                      }}>{t('安排到指定日期…')}</button>
+                      <button onClick={() => addToPlan({ title: t('训练：') + String(tpl.name), sourceModule: 'fitness_template', sourceId: tpl.id })}>
+                        {t('加入今日计划')}
                       </button>
-                      <button className="danger" onClick={() => softDelete('fitness_templates', t.id, '模板')}>删除</button>
+                      <button className="danger" onClick={() => softDelete('fitness_templates', tpl.id, '模板')}>{t('删除')}</button>
                     </Dropdown>
                   </div>
                 );
@@ -378,23 +379,23 @@ export default function FitnessPage() {
       </div>
 
       <div className="card">
-        <h3>训练记录</h3>
+        <h3>{t('训练记录')}</h3>
         {sessions.length === 0 ? (
-          <p className="small muted" style={{ margin: 0 }}>还没有训练记录，从模板开始第一次训练吧。</p>
+          <p className="small muted" style={{ margin: 0 }}>{t('还没有训练记录，从模板开始第一次训练吧。')}</p>
         ) : (
           sessions.slice(0, 12).map((s) => (
             <div className="list-item" key={s.id}>
               <span className="title clickable" onClick={() => setActiveSession(s)}>
                 {String(s.date)} {String(s.name)}
               </span>
-              <span className={'badge ' + (s.status === '已完成' ? 'ok' : s.status === '进行中' ? 'warn' : '')}>{String(s.status)}</span>
-              {s.status === '已完成' && <span className="small muted">容量 {Math.round(volumeOf(s.id))}kg</span>}
+              <span className={'badge ' + (s.status === '已完成' ? 'ok' : s.status === '进行中' ? 'warn' : '')}>{t(String(s.status))}</span>
+              {s.status === '已完成' && <span className="small muted">{t('容量')} {Math.round(volumeOf(s.id))}kg</span>}
               <Dropdown>
-                <button onClick={() => setActiveSession(s)}>打开 / 记录</button>
-                <button onClick={() => addToPlan({ title: `训练：${s.name}`, sourceModule: 'fitness_session', sourceId: s.id, date: String(s.date) })}>
-                  加入当天计划
+                <button onClick={() => setActiveSession(s)}>{t('打开 / 记录')}</button>
+                <button onClick={() => addToPlan({ title: t('训练：') + String(s.name), sourceModule: 'fitness_session', sourceId: s.id, date: String(s.date) })}>
+                  {t('加入当天计划')}
                 </button>
-                <button className="danger" onClick={() => softDelete('fitness_sessions', s.id, '训练记录')}>删除</button>
+                <button className="danger" onClick={() => softDelete('fitness_sessions', s.id, '训练记录')}>{t('删除')}</button>
               </Dropdown>
             </div>
           ))
@@ -403,16 +404,16 @@ export default function FitnessPage() {
 
       <div className="grid-2" style={{ alignItems: 'start' }}>
         <div className="card">
-          <h3>训练趋势 <span className="sub">每次完成训练的总容量</span></h3>
+          <h3>{t('训练趋势')} <span className="sub">{t('每次完成训练的总容量')}</span></h3>
           <TrendSvg
             points={[...completed].reverse().slice(-15).map((s) => ({ label: String(s.date), value: Math.round(volumeOf(s.id)) }))}
             unit="kg"
             color="var(--ok)"
           />
-          <p className="small muted" style={{ marginBottom: 0 }}>近 30 天完成训练 {completed.filter((s) => {
+          <p className="small muted" style={{ marginBottom: 0 }}>{t('近 30 天完成训练')} {completed.filter((s) => {
             const d = new Date(String(s.date) + 'T12:00:00');
             return Date.now() - d.getTime() < 30 * 24 * 3600 * 1000;
-          }).length} 次</p>
+          }).length} {t('次')}</p>
         </div>
         <BodyMetricsCard />
       </div>

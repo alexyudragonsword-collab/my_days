@@ -3,6 +3,7 @@ import { addDays, createRow, invalidateTable, listRows, Row, todayStr } from '..
 import { MEAL_TYPES } from '../constants';
 import { useSoftDelete, useTable } from '../hooks';
 import { useSettings } from '../settings';
+import { t } from '../i18n';
 import { EmptyState, Field, Modal, QueryView, useUI } from '../ui';
 
 function GoalsCard() {
@@ -12,12 +13,12 @@ function GoalsCard() {
   const { toast } = useUI();
   return (
     <div className="card">
-      <h3>每日营养目标</h3>
+      <h3>{t('每日营养目标')}</h3>
       <div className="row wrap">
-        <Field label="热量（千卡）">
+        <Field label={t('热量（千卡）')}>
           <input className="input" type="number" style={{ width: 120 }} value={cal} onChange={(e) => setCal(e.target.value)} />
         </Field>
-        <Field label="蛋白质（克）">
+        <Field label={t('蛋白质（克）')}>
           <input className="input" type="number" style={{ width: 120 }} value={protein} onChange={(e) => setProtein(e.target.value)} />
         </Field>
         <button className="btn primary" style={{ marginTop: 8 }} onClick={async () => {
@@ -25,8 +26,8 @@ function GoalsCard() {
             diet_calories: cal === '' ? null : Number(cal),
             diet_protein: protein === '' ? null : Number(protein),
           });
-          toast('目标已保存');
-        }}>保存目标</button>
+          toast(t('目标已保存'));
+        }}>{t('保存目标')}</button>
       </div>
     </div>
   );
@@ -64,15 +65,15 @@ function AddFoodForm(props: { onAdd: (food: { food_name: string; portion: string
           }
         }}
       >
-        <option value="">常用食物…</option>
+        <option value="">{t('常用食物…')}</option>
         {props.foods.map((f) => <option key={f.id} value={f.id}>{String(f.name)}</option>)}
       </select>
-      <input className="input" style={{ flex: 1, minWidth: 90 }} placeholder="食物名称" value={name}
+      <input className="input" style={{ flex: 1, minWidth: 90 }} placeholder={t('食物名称')} value={name}
         onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && submit()} />
-      <input className="input" style={{ width: 70 }} placeholder="份量" value={portion} onChange={(e) => setPortion(e.target.value)} />
-      <input className="input" style={{ width: 70 }} placeholder="千卡" type="number" value={cal} onChange={(e) => setCal(e.target.value)} />
-      <input className="input" style={{ width: 60 }} placeholder="蛋白" type="number" value={protein} onChange={(e) => setProtein(e.target.value)} />
-      <button className="btn small" onClick={submit}>添加</button>
+      <input className="input" style={{ width: 70 }} placeholder={t('份量')} value={portion} onChange={(e) => setPortion(e.target.value)} />
+      <input className="input" style={{ width: 70 }} placeholder={t('千卡')} type="number" value={cal} onChange={(e) => setCal(e.target.value)} />
+      <input className="input" style={{ width: 60 }} placeholder={t('蛋白')} type="number" value={protein} onChange={(e) => setProtein(e.target.value)} />
+      <button className="btn small" onClick={submit}>{t('添加')}</button>
     </div>
   );
 }
@@ -97,19 +98,19 @@ function FoodsManager(props: { foods: Row[]; onClose: () => void }) {
   };
 
   return (
-    <Modal title="常用食物" onClose={props.onClose}>
+    <Modal title={t('常用食物')} onClose={props.onClose}>
       <div className="row wrap" style={{ marginBottom: 12 }}>
-        <input className="input" style={{ flex: 1 }} placeholder="名称" value={name} onChange={(e) => setName(e.target.value)} />
-        <input className="input" style={{ width: 90 }} placeholder="默认份量" value={portion} onChange={(e) => setPortion(e.target.value)} />
-        <input className="input" style={{ width: 80 }} placeholder="千卡" type="number" value={cal} onChange={(e) => setCal(e.target.value)} />
-        <input className="input" style={{ width: 80 }} placeholder="蛋白g" type="number" value={protein} onChange={(e) => setProtein(e.target.value)} />
-        <button className="btn primary" onClick={add}>添加</button>
+        <input className="input" style={{ flex: 1 }} placeholder={t('名称')} value={name} onChange={(e) => setName(e.target.value)} />
+        <input className="input" style={{ width: 90 }} placeholder={t('默认份量')} value={portion} onChange={(e) => setPortion(e.target.value)} />
+        <input className="input" style={{ width: 80 }} placeholder={t('千卡')} type="number" value={cal} onChange={(e) => setCal(e.target.value)} />
+        <input className="input" style={{ width: 80 }} placeholder={t('蛋白g')} type="number" value={protein} onChange={(e) => setProtein(e.target.value)} />
+        <button className="btn primary" onClick={add}>{t('添加')}</button>
       </div>
       {props.foods.length === 0
-        ? <EmptyState icon="🍚" text="还没有常用食物" hint="把经常吃的食物存起来，以后一键添加" />
+        ? <EmptyState icon="🍚" text={t('还没有常用食物')} hint={t('把经常吃的食物存起来，以后一键添加')} />
         : (
           <table className="tbl">
-            <thead><tr><th>名称</th><th>份量</th><th>千卡</th><th>蛋白质</th><th /></tr></thead>
+            <thead><tr><th>{t('名称')}</th><th>{t('份量')}</th><th>{t('千卡')}</th><th>{t('蛋白质')}</th><th /></tr></thead>
             <tbody>
               {props.foods.map((f) => (
                 <tr key={f.id}>
@@ -117,7 +118,7 @@ function FoodsManager(props: { foods: Row[]; onClose: () => void }) {
                   <td>{String(f.portion || '—')}</td>
                   <td>{f.calories == null ? '—' : String(f.calories)}</td>
                   <td>{f.protein == null ? '—' : String(f.protein)}</td>
-                  <td><button className="btn small danger" onClick={() => softDelete('foods', f.id, '食物')}>删除</button></td>
+                  <td><button className="btn small danger" onClick={() => softDelete('foods', f.id, '食物')}>{t('删除')}</button></td>
                 </tr>
               ))}
             </tbody>
@@ -170,10 +171,10 @@ export default function DietPage() {
   const copyFrom = async (fromDate: string) => {
     const srcMeals = await listRows('meals', { date: fromDate });
     if (srcMeals.length === 0) {
-      toast(`${fromDate} 没有餐食记录`, { error: true });
+      toast(t('{0} 没有餐食记录', fromDate), { error: true });
       return;
     }
-    if (!(await confirm({ title: '复制餐食', body: `把 ${fromDate} 的餐食复制到 ${date}？` }))) return;
+    if (!(await confirm({ title: t('复制餐食'), body: t('把 {0} 的餐食复制到 {1}？', fromDate, date) }))) return;
     for (const sm of srcMeals) {
       const target = await ensureMeal(String(sm.meal_type));
       const srcFoods = allMealFoods.filter((f) => Number(f.meal_id) === sm.id);
@@ -185,7 +186,7 @@ export default function DietPage() {
       }
     }
     invalidateTable('meals', 'meal_foods');
-    toast('已复制餐食');
+    toast(t('已复制餐食'));
   };
 
   const calGoal = settings.diet_calories;
@@ -194,32 +195,32 @@ export default function DietPage() {
   return (
     <div>
       <div className="page-head">
-        <h2>饮食计划</h2>
+        <h2>{t('饮食计划')}</h2>
         <input className="input" type="date" style={{ width: 150 }} value={date} onChange={(e) => setDate(e.target.value)} />
-        <button className="btn" onClick={() => copyFrom(addDays(date, -1))}>复制昨天餐食</button>
+        <button className="btn" onClick={() => copyFrom(addDays(date, -1))}>{t('复制昨天餐食')}</button>
         <button className="btn" onClick={() => {
-          const d = window.prompt('从哪一天复制？（YYYY-MM-DD）');
+          const d = window.prompt(t('从哪一天复制？（YYYY-MM-DD）'));
           if (d && /^\d{4}-\d{2}-\d{2}$/.test(d)) copyFrom(d);
-        }}>从指定日期复制</button>
-        <button className="btn" onClick={() => setFoodsOpen(true)}>常用食物</button>
+        }}>{t('从指定日期复制')}</button>
+        <button className="btn" onClick={() => setFoodsOpen(true)}>{t('常用食物')}</button>
       </div>
 
       <GoalsCard />
 
       <div className="card">
-        <h3>{fmtDate(date)} 营养汇总 <span className="sub">按已填写数据自动汇总</span></h3>
+        <h3>{fmtDate(date)} {t('营养汇总')} <span className="sub">{t('按已填写数据自动汇总')}</span></h3>
         <div className="stat-row">
           <div className="stat">
             <div className="num">{Math.round(actual.cal)}{calGoal ? <span className="small muted"> / {calGoal}</span> : null}</div>
-            <div className="lbl">实际热量（千卡）</div>
+            <div className="lbl">{t('实际热量（千卡）')}</div>
           </div>
           <div className="stat">
             <div className="num">{Math.round(actual.protein)}{proteinGoal ? <span className="small muted"> / {proteinGoal}g</span> : null}</div>
-            <div className="lbl">实际蛋白质（克）</div>
+            <div className="lbl">{t('实际蛋白质（克）')}</div>
           </div>
           <div className="stat">
             <div className="num">{Math.round(planned.cal)}</div>
-            <div className="lbl">计划热量（千卡）</div>
+            <div className="lbl">{t('计划热量（千卡）')}</div>
           </div>
         </div>
         {calGoal ? (
@@ -236,16 +237,16 @@ export default function DietPage() {
                 meal ? dayFoods.filter((f) => Number(f.meal_id) === meal.id && f.kind === kind) : [];
               return (
                 <div className="card" key={mt}>
-                  <h3>{mt}</h3>
+                  <h3>{t(mt)}</h3>
                   <div className="grid-2" style={{ alignItems: 'start' }}>
                     {(['planned', 'actual'] as const).map((kind) => (
                       <div key={kind}>
                         <div className="small muted" style={{ marginBottom: 4 }}>
-                          {kind === 'planned' ? '📋 计划吃什么' : '✅ 实际吃了什么'}
+                          {kind === 'planned' ? '📋 ' + t('计划吃什么') : '✅ ' + t('实际吃了什么')}
                         </div>
                         {foodsOf(kind).length === 0 && (
                           <p className="small muted" style={{ margin: '4px 0' }}>
-                            {kind === 'planned' ? '未安排' : '未记录'}
+                            {t(kind === 'planned' ? '未安排' : '未记录')}
                           </p>
                         )}
                         {foodsOf(kind).map((f) => (
@@ -255,8 +256,8 @@ export default function DietPage() {
                               {f.portion ? <span className="muted">（{String(f.portion)}）</span> : null}
                             </span>
                             <span className="muted">
-                              {f.calories != null ? `${f.calories}千卡` : ''}
-                              {f.protein != null ? ` ${f.protein}g蛋白` : ''}
+                              {f.calories != null ? `${f.calories}${t('千卡')}` : ''}
+                              {f.protein != null ? ` ${f.protein}${t('g蛋白')}` : ''}
                             </span>
                             <button className="btn small" onClick={() => softDelete('meal_foods', f.id, '食物记录')}>✕</button>
                           </div>

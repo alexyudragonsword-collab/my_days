@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import React, { useEffect, useState } from 'react';
 import { NavLink, Route, Routes, useNavigate } from 'react-router-dom';
 import { apiGet, apiPost, onSaveState, queryClient, SaveState, todayStr } from './api';
+import { t } from './i18n';
 import { SettingsProvider, useSettings } from './settings';
 import { fmtDateTime, Modal, UIProvider, useUI } from './ui';
 import ConsultPage from './pages/Consult';
@@ -76,20 +77,20 @@ function SearchPalette(props: { onClose: () => void }) {
       <div className="palette">
         <input
           autoFocus
-          placeholder="搜索全部模块的记录…（Esc 关闭）"
+          placeholder={t('搜索全部模块的记录…（Esc 关闭）')}
           value={q}
           onChange={(e) => setQ(e.target.value)}
           onKeyDown={(e) => e.key === 'Escape' && props.onClose()}
         />
         <div className="results">
-          {!q.trim() && <div className="state-box small">输入关键词，搜索计划、备忘、自媒体、开发、咨询、健身、饮食和游戏记录</div>}
+          {!q.trim() && <div className="state-box small">{t('输入关键词，搜索计划、备忘、自媒体、开发、咨询、健身、饮食和游戏记录')}</div>}
           {q.trim() && query.isLoading && <div className="state-box"><span className="spinner" /></div>}
           {q.trim() && query.data && query.data.groups.length === 0 && (
-            <div className="state-box">没有找到与“{q}”相关的记录</div>
+            <div className="state-box">{t('没有找到与“{0}”相关的记录', q)}</div>
           )}
           {query.data?.groups.map((g) => (
             <div key={g.module}>
-              <div className="group-title">{g.moduleLabel}</div>
+              <div className="group-title">{t(g.moduleLabel)}</div>
               {g.results.map((r) => (
                 <div
                   key={r.table + r.id}
@@ -99,7 +100,7 @@ function SearchPalette(props: { onClose: () => void }) {
                     props.onClose();
                   }}
                 >
-                  <span className="badge">{r.label}</span>
+                  <span className="badge">{t(r.label)}</span>
                   <span className="title">{r.title}</span>
                 </div>
               ))}
@@ -132,17 +133,17 @@ function TopBar(props: { onSearch: () => void; onQuickAdd: () => void }) {
     try {
       await apiPost('/api/save');
       queryClient.invalidateQueries({ queryKey: ['status'] });
-      toast('已保存到本地数据文件');
+      toast(t('已保存到本地数据文件'));
     } catch (e) {
-      toast('保存失败：' + (e instanceof Error ? e.message : e), { error: true });
+      toast(t('保存失败：') + (e instanceof Error ? e.message : e), { error: true });
     }
   };
 
   const saveAndExit = async () => {
     const ok = await confirm({
-      title: '保存并退出',
-      body: '将提交所有草稿并把数据写入本地文件，然后关闭后台服务。下次使用时重新运行启动文件即可。',
-      confirmText: '保存并退出',
+      title: t('保存并退出'),
+      body: t('将提交所有草稿并把数据写入本地文件，然后关闭后台服务。下次使用时重新运行启动文件即可。'),
+      confirmText: t('保存并退出'),
     });
     if (!ok) return;
     window.dispatchEvent(new CustomEvent('my-days:flush-drafts'));
@@ -151,43 +152,43 @@ function TopBar(props: { onSearch: () => void; onQuickAdd: () => void }) {
       await apiPost('/api/system/exit');
       setExited(true);
     } catch (e) {
-      toast('退出失败：' + (e instanceof Error ? e.message : e), { error: true });
+      toast(t('退出失败：') + (e instanceof Error ? e.message : e), { error: true });
     }
   };
 
   if (exited) {
     return (
       <div className="topbar">
-        <span className="badge ok">数据已安全保存，后台服务已退出，可以关闭此页面</span>
+        <span className="badge ok">{t('数据已安全保存，后台服务已退出，可以关闭此页面')}</span>
       </div>
     );
   }
 
   const saveBadge = {
     idle: null,
-    saving: <span className="badge">保存中…</span>,
-    saved: <span className="badge ok">已保存</span>,
-    error: <span className="badge danger" title={saveError}>保存失败</span>,
+    saving: <span className="badge">{t('保存中…')}</span>,
+    saved: <span className="badge ok">{t('已保存')}</span>,
+    error: <span className="badge danger" title={saveError}>{t('保存失败')}</span>,
   }[saveState];
 
   return (
     <div className="topbar">
       <span className="date">{fmtDate(todayStr())}</span>
       <button className="search-trigger" onClick={props.onSearch}>
-        🔍 搜索… <span className="small muted">Ctrl+K</span>
+        🔍 {t('搜索…')} <span className="small muted">Ctrl+K</span>
       </button>
       <div className="spacer" />
       {saveBadge}
       {backup?.lastError ? (
-        <span className="badge danger" title={backup.lastError}>备份失败</span>
+        <span className="badge danger" title={backup.lastError}>{t('备份失败')}</span>
       ) : backup?.lastBackupAt ? (
-        <span className="badge small" title={'最近备份：' + fmtDateTime(backup.lastBackupAt)}>
-          备份 {fmtDateTime(backup.lastBackupAt).slice(5)}
+        <span className="badge small" title={t('最近备份：') + fmtDateTime(backup.lastBackupAt)}>
+          {t('备份')} {fmtDateTime(backup.lastBackupAt).slice(5)}
         </span>
       ) : null}
-      <button className="btn" onClick={manualSave} title="立即提交草稿并把数据写入本地数据文件">手动保存</button>
-      <button className="btn" onClick={saveAndExit} title="保存全部数据并关闭本地后台服务">保存并退出</button>
-      <button className="btn primary" onClick={props.onQuickAdd}>＋ 快速新增</button>
+      <button className="btn" onClick={manualSave} title={t('立即提交草稿并把数据写入本地数据文件')}>{t('手动保存')}</button>
+      <button className="btn" onClick={saveAndExit} title={t('保存全部数据并关闭本地后台服务')}>{t('保存并退出')}</button>
+      <button className="btn primary" onClick={props.onQuickAdd}>＋ {t('快速新增')}</button>
     </div>
   );
 }
@@ -211,26 +212,26 @@ function Shell() {
   return (
     <div className="layout">
       <div className={'sidebar' + (collapsed ? ' collapsed' : '')}>
-        <div className="brand">📋 {!collapsed && '个人工作台'}</div>
+        <div className="brand">📋 {!collapsed && t('个人工作台')}</div>
         {NAV_GROUPS.map((g) => (
           <div className="nav-group" key={g.title}>
-            {!collapsed && <div className="nav-group-title">{g.title}</div>}
+            {!collapsed && <div className="nav-group-title">{t(g.title)}</div>}
             {g.items.map((item) => (
               <NavLink
                 key={item.to}
                 to={item.to}
                 end={item.to === '/'}
                 className={({ isActive }) => 'nav-item' + (isActive ? ' active' : '')}
-                title={item.label}
+                title={t(item.label)}
               >
                 <span>{item.icon}</span>
-                {!collapsed && <span>{item.label}</span>}
+                {!collapsed && <span>{t(item.label)}</span>}
               </NavLink>
             ))}
           </div>
         ))}
         <button className="collapse-btn" onClick={() => setCollapsed((c) => !c)}>
-          {collapsed ? '»' : '« 收起导航'}
+          {collapsed ? '»' : '« ' + t('收起导航')}
         </button>
       </div>
       <div className="main">

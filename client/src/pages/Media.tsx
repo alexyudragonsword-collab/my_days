@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { createRow, invalidateTable, Row, todayStr, updateRow } from '../api';
 import { MEDIA_STAGES } from '../constants';
 import { useAddToPlan, useClearOpenParam, useOpenParam, useSoftDelete, useTable } from '../hooks';
+import { t } from '../i18n';
 import { Drawer, Dropdown, EmptyState, Field, QueryView, useUI } from '../ui';
 
 function MediaEditor(props: { item: Row; onClose: () => void }) {
@@ -39,52 +40,52 @@ function MediaEditor(props: { item: Row; onClose: () => void }) {
       comments: form.comments === '' ? null : Number(form.comments),
     });
     invalidateTable('media_contents');
-    toast('已保存');
+    toast(t('已保存'));
     props.onClose();
   };
 
   return (
-    <Drawer title="内容详情" onClose={props.onClose}>
-      <Field label="标题"><input className="input" value={form.title} onChange={(e) => set('title', e.target.value)} /></Field>
+    <Drawer title={t('内容详情')} onClose={props.onClose}>
+      <Field label={t('标题')}><input className="input" value={form.title} onChange={(e) => set('title', e.target.value)} /></Field>
       <div className="grid-2">
-        <Field label="发布平台">
-          <input className="input" value={form.platform} onChange={(e) => set('platform', e.target.value)} placeholder="B站 / 抖音 / 公众号…" />
+        <Field label={t('发布平台')}>
+          <input className="input" value={form.platform} onChange={(e) => set('platform', e.target.value)} placeholder={t('B站 / 抖音 / 公众号…')} />
         </Field>
-        <Field label="内容形式">
-          <input className="input" value={form.form} onChange={(e) => set('form', e.target.value)} placeholder="视频 / 图文 / 直播…" />
+        <Field label={t('内容形式')}>
+          <input className="input" value={form.form} onChange={(e) => set('form', e.target.value)} placeholder={t('视频 / 图文 / 直播…')} />
         </Field>
-        <Field label="制作阶段">
+        <Field label={t('制作阶段')}>
           <select className="input" value={form.stage} onChange={(e) => set('stage', e.target.value)}>
-            {MEDIA_STAGES.map((s) => <option key={s}>{s}</option>)}
+            {MEDIA_STAGES.map((s) => <option key={s} value={s}>{t(s)}</option>)}
           </select>
         </Field>
-        <Field label="计划发布日期">
+        <Field label={t('计划发布日期')}>
           <input className="input" type="date" value={form.planned_date} onChange={(e) => set('planned_date', e.target.value)} />
         </Field>
-        <Field label="实际发布日期">
+        <Field label={t('实际发布日期')}>
           <input className="input" type="date" value={form.actual_date} onChange={(e) => set('actual_date', e.target.value)} />
         </Field>
       </div>
-      <Field label="文案 / 内容笔记">
+      <Field label={t('文案 / 内容笔记')}>
         <textarea className="input" rows={4} value={form.notes} onChange={(e) => set('notes', e.target.value)} />
       </Field>
-      <Field label="素材本地位置">
-        <input className="input" value={form.asset_path} onChange={(e) => set('asset_path', e.target.value)} placeholder="例如 D:\素材\第12期" />
+      <Field label={t('素材本地位置')}>
+        <input className="input" value={form.asset_path} onChange={(e) => set('asset_path', e.target.value)} placeholder={t('例如 D:\\素材\\第12期')} />
       </Field>
-      <Field label="发布链接">
-        <input className="input" value={form.publish_link} onChange={(e) => set('publish_link', e.target.value)} placeholder="发布后粘贴链接" />
+      <Field label={t('发布链接')}>
+        <input className="input" value={form.publish_link} onChange={(e) => set('publish_link', e.target.value)} placeholder={t('发布后粘贴链接')} />
       </Field>
       <div className="grid-2">
-        <Field label="播放/阅读量"><input className="input" type="number" value={form.views} onChange={(e) => set('views', e.target.value)} /></Field>
-        <Field label="点赞数"><input className="input" type="number" value={form.likes} onChange={(e) => set('likes', e.target.value)} /></Field>
-        <Field label="评论数"><input className="input" type="number" value={form.comments} onChange={(e) => set('comments', e.target.value)} /></Field>
+        <Field label={t('播放/阅读量')}><input className="input" type="number" value={form.views} onChange={(e) => set('views', e.target.value)} /></Field>
+        <Field label={t('点赞数')}><input className="input" type="number" value={form.likes} onChange={(e) => set('likes', e.target.value)} /></Field>
+        <Field label={t('评论数')}><input className="input" type="number" value={form.comments} onChange={(e) => set('comments', e.target.value)} /></Field>
       </div>
       {form.publish_link && (
-        <p className="small"><a href={form.publish_link} target="_blank" rel="noreferrer">打开发布链接（外部链接）↗</a></p>
+        <p className="small"><a href={form.publish_link} target="_blank" rel="noreferrer">{t('打开发布链接（外部链接）↗')}</a></p>
       )}
       <div className="row" style={{ justifyContent: 'flex-end' }}>
-        <button className="btn" onClick={props.onClose}>取消</button>
-        <button className="btn primary" onClick={save}>保存</button>
+        <button className="btn" onClick={props.onClose}>{t('取消')}</button>
+        <button className="btn primary" onClick={save}>{t('保存')}</button>
       </div>
     </Drawer>
   );
@@ -113,12 +114,12 @@ export default function MediaPage() {
   }, [openParam, query.data]);
 
   const addIdea = async () => {
-    const t = quick.trim();
-    if (!t) return;
-    await createRow('media_contents', { title: t, stage: '灵感' });
+    const v = quick.trim();
+    if (!v) return;
+    await createRow('media_contents', { title: v, stage: '灵感' });
     invalidateTable('media_contents');
     setQuick('');
-    toast('灵感已记录');
+    toast(t('灵感已记录'));
   };
 
   const moveStage = async (item: Row, stage: string) => {
@@ -129,31 +130,31 @@ export default function MediaPage() {
   };
 
   const markPublished = async (item: Row) => {
-    const link = window.prompt('发布链接（可留空）', String(item.publish_link || ''));
+    const link = window.prompt(t('发布链接（可留空）'), String(item.publish_link || ''));
     await updateRow('media_contents', item.id, {
       stage: '已发布',
       actual_date: String(item.actual_date || '') || todayStr(),
       publish_link: link || null,
     });
     invalidateTable('media_contents');
-    toast('已标记为已发布');
+    toast(t('已标记为已发布'));
   };
 
   const archive = async (item: Row) => {
-    if (!(await confirm({ title: '归档内容', body: `归档后「${item.title}」将不再显示在看板中。` }))) return;
+    if (!(await confirm({ title: t('归档内容'), body: t('归档后「{0}」将不再显示在看板中。', String(item.title)) }))) return;
     await updateRow('media_contents', item.id, { archived: 1 });
     invalidateTable('media_contents');
-    toast('已归档');
+    toast(t('已归档'));
   };
 
   return (
     <div>
       <div className="page-head">
-        <h2>自媒体</h2>
+        <h2>{t('自媒体')}</h2>
         <input
           className="input"
           style={{ width: 280 }}
-          placeholder="💡 快速记录灵感，回车保存"
+          placeholder={'💡 ' + t('快速记录灵感，回车保存')}
           value={quick}
           onChange={(e) => setQuick(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && addIdea()}
@@ -162,8 +163,8 @@ export default function MediaPage() {
       <QueryView
         query={query}
         isEmpty={(rows) => rows.length === 0}
-        empty={<EmptyState icon="🎬" text="还没有自媒体内容" hint="从记录一个灵感开始你的创作流程"
-          action={<button className="btn primary" onClick={() => { setQuick('我的第一个灵感'); }}>先记录一个灵感</button>} />}
+        empty={<EmptyState icon="🎬" text={t('还没有自媒体内容')} hint={t('从记录一个灵感开始你的创作流程')}
+          action={<button className="btn primary" onClick={() => { setQuick(t('我的第一个灵感')); }}>{t('先记录一个灵感')}</button>} />}
       >
         {(rows) => (
           <div className="kanban">
@@ -181,7 +182,7 @@ export default function MediaPage() {
                   if (item && item.stage !== stage) await moveStage(item, stage);
                 }}
               >
-                <h4>{stage}（{rows.filter((r) => r.stage === stage).length}）</h4>
+                <h4>{t(stage)}（{rows.filter((r) => r.stage === stage).length}）</h4>
                 {rows.filter((r) => r.stage === stage).map((item) => (
                   <div
                     key={item.id}
@@ -192,22 +193,22 @@ export default function MediaPage() {
                     <div className="row" style={{ justifyContent: 'space-between' }}>
                       <span className="clickable" style={{ flex: 1 }} onClick={() => setEditing(item)}>{String(item.title)}</span>
                       <Dropdown>
-                        <button onClick={() => setEditing(item)}>编辑详情</button>
+                        <button onClick={() => setEditing(item)}>{t('编辑详情')}</button>
                         {MEDIA_STAGES.filter((s) => s !== stage).map((s) => (
-                          <button key={s} onClick={() => moveStage(item, s)}>移到「{s}」</button>
+                          <button key={s} onClick={() => moveStage(item, s)}>{t('移到「{0}」', t(s))}</button>
                         ))}
-                        <button onClick={() => markPublished(item)}>标记已发布…</button>
-                        <button onClick={() => addToPlan({ title: `推进内容：${item.title}`, sourceModule: 'media', sourceId: item.id })}>
-                          加入今日计划
+                        <button onClick={() => markPublished(item)}>{t('标记已发布…')}</button>
+                        <button onClick={() => addToPlan({ title: t('推进内容：') + String(item.title), sourceModule: 'media', sourceId: item.id })}>
+                          {t('加入今日计划')}
                         </button>
-                        <button onClick={() => archive(item)}>归档</button>
-                        <button className="danger" onClick={() => softDelete('media_contents', item.id, '内容')}>删除</button>
+                        <button onClick={() => archive(item)}>{t('归档')}</button>
+                        <button className="danger" onClick={() => softDelete('media_contents', item.id, '内容')}>{t('删除')}</button>
                       </Dropdown>
                     </div>
                     <div className="small muted" style={{ marginTop: 4 }}>
                       {[item.platform, item.form].filter(Boolean).join(' · ')}
-                      {item.planned_date ? ` · 计划 ${item.planned_date}` : ''}
-                      {item.stage === '已发布' && item.views != null ? ` · ${item.views} 播放` : ''}
+                      {item.planned_date ? ` · ${t('计划')} ${item.planned_date}` : ''}
+                      {item.stage === '已发布' && item.views != null ? ` · ${item.views} ${t('播放')}` : ''}
                     </div>
                   </div>
                 ))}

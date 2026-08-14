@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import React from 'react';
 import { apiDelete, apiGet, apiPatch, apiPost, queryClient } from '../api';
-import { useSettings } from '../settings';
+import { APPEARANCES, useSettings } from '../settings';
 import { EmptyState, Field, fmtDateTime, fmtSize, QueryView, useUI } from '../ui';
 
 const TYPE_LABEL: Record<string, string> = { auto: '自动', manual: '手动', safety: '安全备份' };
@@ -214,6 +214,36 @@ function TrashCard() {
   );
 }
 
+function AppearanceCard() {
+  const { settings, update } = useSettings();
+  const { toast } = useUI();
+  return (
+    <div className="card">
+      <h3>界面外观 <span className="sub">只改变界面样式，不影响任何业务数据</span></h3>
+      <div className="appearance-grid">
+        {APPEARANCES.map((a) => (
+          <button
+            key={a.key}
+            className={'appearance-option' + (settings.appearance === a.key ? ' selected' : '')}
+            data-preview={a.key}
+            onClick={async () => {
+              await update({ appearance: a.key });
+              toast(`已切换为「${a.label}」外观`);
+            }}
+          >
+            <span className="preview">
+              <span className="p-dot" /><span className="p-bar" /><span className="p-chip" />
+            </span>
+            <strong>{a.label}</strong>
+            <span className="small muted">{a.desc}</span>
+          </button>
+        ))}
+      </div>
+      <p className="small muted" style={{ marginBottom: 0 }}>每种外观都支持下方“主题”里的浅色与深色模式。</p>
+    </div>
+  );
+}
+
 function PreferencesCard() {
   const { settings, update } = useSettings();
   const { toast } = useUI();
@@ -283,6 +313,7 @@ export default function SettingsPage() {
       <BackupsCard />
       <ExportCard />
       <TrashCard />
+      <AppearanceCard />
       <PreferencesCard />
     </div>
   );

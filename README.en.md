@@ -18,6 +18,16 @@ A local, single-user work & life management app. It brings your daily plans, med
 - **Bilingual UI**: switch between 中文 and English in Settings → Preferences; business data is never touched by the switch
 - **Four appearances**: Default, Liquid Glass, Notion Notebook and Neo-Brutalism — each with light & dark themes
 
+## Screenshots
+
+| Default | English UI |
+| --- | --- |
+| ![Default home](docs/screenshots/home-default.png) | ![English home](docs/screenshots/home-english.png) |
+
+| Liquid Glass | Notion Notebook | Neo-Brutalism |
+| --- | --- | --- |
+| ![Liquid Glass](docs/screenshots/appearance-glass.png) | ![Notion Notebook](docs/screenshots/appearance-notion.png) | ![Neo-Brutalism](docs/screenshots/appearance-brutal.png) |
+
 ## Requirements
 
 - Node.js 18 or newer (22 recommended)
@@ -85,3 +95,7 @@ npm run test:e2e  # Chromium end-to-end acceptance (run `npx playwright install 
 ```
 
 Locally you can point the e2e suite at an existing Chromium with `CHROMIUM_PATH=/path/to/chrome npx playwright test`. See `docs/ACCEPTANCE.md` for the mapping between acceptance criteria and automated tests. GitHub Actions runs build + server tests on Linux, macOS and Windows, plus the browser suite on Linux.
+
+## Project docs
+
+[PRD.md](PRD.md) (v1 requirements, in Chinese) · [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) (architecture & conventions) · [docs/API.md](docs/API.md) · [docs/DATA_MODEL.md](docs/DATA_MODEL.md) · [docs/ACCEPTANCE.md](docs/ACCEPTANCE.md) · [CHANGELOG.md](CHANGELOG.md)

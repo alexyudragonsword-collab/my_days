@@ -20,6 +20,16 @@
 
 各业务模块的记录都可以“加入今日计划”，计划事项只保存关联而不复制业务数据；修改来源记录的标题，首页和今日计划会同步显示。
 
+## 界面预览
+
+| 默认外观 | English 模式 |
+| --- | --- |
+| ![默认外观首页](docs/screenshots/home-default.png) | ![English 首页](docs/screenshots/home-english.png) |
+
+| 流光玻璃 | Notion 笔记 | Neo-Brutalism |
+| --- | --- | --- |
+| ![流光玻璃](docs/screenshots/appearance-glass.png) | ![Notion 笔记](docs/screenshots/appearance-notion.png) | ![Neo-Brutalism](docs/screenshots/appearance-brutal.png) |
+
 ## 环境要求
 
 - Node.js 18 或更高版本（推荐 22）
@@ -114,3 +124,15 @@ npm run test:e2e  # Chromium 浏览器端到端验收（需要 npx playwright in
 ```
 
 验收标准 AC-001~040 与自动化测试的对应关系见 `docs/ACCEPTANCE.md`。仓库的 GitHub Actions 会在 Linux、macOS 和 Windows 上运行构建与服务端测试，并在 Linux 上运行浏览器端到端验收。
+
+## 项目文档
+
+| 文档 | 内容 |
+| --- | --- |
+| [PRD.md](PRD.md) | 第一版产品需求（验收标准 AC-001~040 的来源） |
+| [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | 架构、目录结构、开发约定（i18n 纪律、迁移流程、外观机制） |
+| [docs/API.md](docs/API.md) | REST 接口参考与错误码 |
+| [docs/DATA_MODEL.md](docs/DATA_MODEL.md) | 全部数据表结构与字段语义 |
+| [docs/ACCEPTANCE.md](docs/ACCEPTANCE.md) | 验收标准 → 自动化测试映射表 |
+| [CHANGELOG.md](CHANGELOG.md) | 版本更新记录 |
+| [CLAUDE.md](CLAUDE.md) | AI 协作开发须知 |

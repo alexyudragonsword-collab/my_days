@@ -1,0 +1,67 @@
+{
+  "name": "my-days-desktop",
+  "version": "1.0.0",
+  "private": true,
+  "description": "个人工作台桌面版 / My Workspace desktop app",
+  "main": "main.js",
+  "author": "alexyudragonsword-collab",
+  "license": "MIT",
+  "scripts": {
+    "postinstall": "electron-builder install-app-deps",
+    "start": "electron .",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.10.0"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.mydays.workspace",
+    "productName": "MyDays",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "bundle/**/*"
+    ],
+    "asarUnpack": [
+      "**/*.node"
+    ],
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
+      "category": "public.app-category.productivity"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis"
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": true,
+      "deleteAppDataOnUninstall": false
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage"
+        }
+      ],
+      "category": "Office"
+    }
+  }
+}

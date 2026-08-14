@@ -1,5 +1,7 @@
 # 个人工作台（my_days）
 
+[English README](README.en.md)
+
 只供个人使用的本地工作生活管理 App。把每天的计划、自媒体创作、开发工作、咨询工作、健身、饮食和游戏娱乐集中在一个本地应用中，所有数据保存在你电脑上的一个 SQLite 文件里，不需要联网、注册或登录。
 
 ## 功能一览
@@ -82,6 +84,7 @@ MyDays/
 - **自动备份**：应用每天自动备份一次（启动时和运行中每小时检查）；普通自动备份最多保留 30 份，勾选“长期保留”的备份不会被自动清理。
 - **恢复**：在备份列表点击「恢复」，确认后系统会先自动创建一份当前数据的安全备份，再用所选备份覆盖数据；无效或损坏的备份会被拒绝，当前数据不受影响。
 - **导出**：「导出 ZIP」生成压缩包，内含清单、机读的全量 JSON 和每个模块一份 CSV（可用 Excel 等表格软件打开）；导出不修改主数据，也不能替代备份。
+- **导入**：「数据与设置」→「选择导出 ZIP 导入」，从导出文件完整恢复全部业务数据（用于迁移到新电脑）；导入会完整替换当前数据，替换前自动创建安全备份。
 
 ## 日常小贴士
 
@@ -89,11 +92,25 @@ MyDays/
 - `Ctrl / Command + K` 打开全局搜索，可跨模块搜索并直接跳转到记录。
 - 删除的记录会先进入「数据与设置」页的回收站，可以恢复；永久删除需要再次确认。
 
+## 桌面版（免 Node 安装包）
+
+不想安装 Node.js 的话，可以使用 Electron 桌面版：在仓库的 GitHub Actions「桌面版安装包」工作流（或版本 Release）中下载对应系统的安装包——macOS 为 `.dmg`、Windows 为 `.exe`、Linux 为 `.AppImage`。桌面版与源码版使用相同的数据目录，两种方式可以混用。
+
+> 安装包未经 Apple 公证 / Windows 代码签名，首次打开时系统可能提示"未知开发者"：macOS 右键 → 打开，Windows 点击"仍要运行"即可。
+
+本地构建桌面版：
+
+```bash
+npm run build && node scripts/build-desktop.mjs
+cd desktop && npm install && npx electron-builder
+```
+
 ## 测试与持续集成
 
 ```bash
 npm run verify    # 构建 + 服务端集成测试（针对真实构建产物启动服务）
 npm run test:e2e  # Chromium 浏览器端到端验收（需要 npx playwright install chromium）
+# 本地已有 Chromium 时可指定：CHROMIUM_PATH=/path/to/chrome npx playwright test
 ```
 
 验收标准 AC-001~040 与自动化测试的对应关系见 `docs/ACCEPTANCE.md`。仓库的 GitHub Actions 会在 Linux、macOS 和 Windows 上运行构建与服务端测试，并在 Linux 上运行浏览器端到端验收。

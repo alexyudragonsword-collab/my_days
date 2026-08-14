@@ -4,3 +4,5 @@ dist/
 .DS_Store
 .e2e-data/
 test-results/
+desktop/bundle/
+desktop/dist/

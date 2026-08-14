@@ -56,8 +56,56 @@ export function weekdayCharLabel(ch: string): string {
   return idx >= 0 ? WEEKDAY_NAMES.en[idx] : ch;
 }
 
+/** 服务端稳定错误码 → 中文文案（再经 t() 翻译成当前语言） */
+const SERVER_ERRORS: Record<string, string> = {
+  NOT_FOUND: '记录不存在',
+  UNKNOWN_TABLE: '未知数据表',
+  NO_FIELDS: '没有可更新的字段',
+  BACKUP_KEPT: '该备份已标记长期保留，请先取消标记',
+  BACKUP_MISSING: '备份文件不存在',
+  BACKUP_INVALID: '备份无效，已取消恢复',
+  INTEGRITY_FAIL: '数据完整性检查失败',
+  INVALID_ORIGIN: '请求来源无效',
+  IMPORT_INVALID: '导入文件无效',
+  IMPORT_NEWER_SCHEMA: '导入数据来自更新版本，请先升级应用',
+};
+
+export function serverErrorMessage(code?: string, detail?: string): string | null {
+  if (!code || !SERVER_ERRORS[code]) return null;
+  const base = t(SERVER_ERRORS[code]);
+  return detail ? `${base}: ${detail}` : base;
+}
+
 // 词典：中文原文 → 英文（业务数据中的枚举值仅在显示层翻译）
 const DICT: Record<string, string> = {
+  '已归档 / 已转换': 'Archived / converted',
+  '已转换': 'Converted',
+  '打开目标': 'Open target',
+  '已恢复为活动备忘': 'Restored to active memos',
+  '本次计时已超过 {0}，可能是忘记结束了。确认照实记录吗？（也可以在菜单中放弃本次计时）': 'This session has been running for {0} — maybe you forgot to end it. Record it as is? (You can also discard the timer from the menu.)',
+  '照实记录': 'Record as is',
+  '放弃本次计时': 'Discard this timer',
+  '已放弃本次计时': 'Timer discarded',
+  '从导出文件导入': 'Import from export file',
+  '确认导入': 'Confirm import',
+  '导入将用文件中的数据完整替换当前全部业务数据与设置。替换前会自动创建一份当前数据的安全备份。': 'Importing will fully replace all current data and settings with the file contents. A safety backup of the current data is created first.',
+  '导入数据': 'Import Data',
+  '从本应用导出的 ZIP 文件恢复全部业务数据，用于迁移到新电脑。导入会完整替换当前数据，替换前自动创建安全备份。': 'Restore all data from a ZIP exported by this app — for migrating to a new computer. Import fully replaces current data; a safety backup is created first.',
+  '导入中…': 'Importing…',
+  '选择导出 ZIP 导入': 'Choose export ZIP to import',
+  '导入成功（{0} 条记录），正在重新加载…': 'Imported {0} records — reloading…',
+  '导入失败：': 'Import failed: ',
+  '导入文件无效': 'Invalid import file',
+  '＋ 给这天添加事项，回车创建': '＋ Add an item for this day, press Enter',
+  '记录不存在': 'Record not found',
+  '未知数据表': 'Unknown table',
+  '没有可更新的字段': 'Nothing to update',
+  '该备份已标记长期保留，请先取消标记': 'This backup is marked as keep — remove the flag first',
+  '备份文件不存在': 'Backup file not found',
+  '备份无效，已取消恢复': 'Backup is invalid; restore cancelled',
+  '数据完整性检查失败': 'Data integrity check failed',
+  '请求来源无效': 'Invalid request origin',
+  '导入数据来自更新版本，请先升级应用': 'The import comes from a newer version — please upgrade the app first',
   '添加': 'Add',
   '创建': 'Create',
   '保存': 'Save',

@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import React from 'react';
+import React, { useRef, useState } from 'react';
 import { apiDelete, apiGet, apiPatch, apiPost, queryClient } from '../api';
 import { t } from '../i18n';
 import { APPEARANCES, useSettings } from '../settings';
@@ -176,6 +176,55 @@ function ExportCard() {
   );
 }
 
+function ImportCard() {
+  const { toast, confirm } = useUI();
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+
+  const doImport = async (file: File) => {
+    const ok = await confirm({
+      title: t('从导出文件导入'),
+      danger: true,
+      confirmText: t('确认导入'),
+      body: t('导入将用文件中的数据完整替换当前全部业务数据与设置。替换前会自动创建一份当前数据的安全备份。'),
+    });
+    if (!ok) return;
+    setBusy(true);
+    try {
+      const res = await fetch('/api/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/zip' },
+        body: await file.arrayBuffer(),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || t('导入文件无效'));
+      toast(t('导入成功（{0} 条记录），正在重新加载…', data.imported));
+      setTimeout(() => window.location.reload(), 800);
+    } catch (e) {
+      toast(t('导入失败：') + (e instanceof Error ? e.message : e), { error: true });
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="card">
+      <h3>{t('导入数据')}</h3>
+      <p className="small muted">
+        {t('从本应用导出的 ZIP 文件恢复全部业务数据，用于迁移到新电脑。导入会完整替换当前数据，替换前自动创建安全备份。')}
+      </p>
+      <input ref={fileRef} type="file" accept=".zip" style={{ display: 'none' }}
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) doImport(f);
+          e.target.value = '';
+        }} />
+      <button className="btn" disabled={busy} onClick={() => fileRef.current?.click()}>
+        {busy ? t('导入中…') : t('选择导出 ZIP 导入')}
+      </button>
+    </div>
+  );
+}
+
 function TrashCard() {
   const query = useQuery({ queryKey: ['trash'], queryFn: () => apiGet<any>('/api/trash') });
   const { toast, confirm } = useUI();
@@ -331,6 +380,7 @@ export default function SettingsPage() {
       <DataFileCard />
       <BackupsCard />
       <ExportCard />
+      <ImportCard />
       <TrashCard />
       <AppearanceCard />
       <PreferencesCard />

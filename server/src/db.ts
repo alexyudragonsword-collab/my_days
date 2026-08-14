@@ -9,7 +9,7 @@ export const BACKUP_DIR = path.join(DATA_DIR, 'backups');
 export const DB_PATH = path.join(DB_DIR, 'my_days.db');
 
 // 迁移文件目录：dist 编译产物位于 server/dist/，源码位于 server/src/，二者相对位置一致
-const MIGRATIONS_DIR = path.resolve(__dirname, '../migrations');
+const MIGRATIONS_DIR = process.env.MY_DAYS_MIGRATIONS_DIR || path.resolve(__dirname, '../migrations');
 
 /** 按文件名顺序执行尚未应用的 SQL 迁移，每个迁移在独立事务中执行 */
 function migrate(d: Database.Database): void {

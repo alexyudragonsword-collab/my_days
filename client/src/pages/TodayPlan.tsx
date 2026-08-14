@@ -120,6 +120,30 @@ export function PlanItemEditor(props: { item: Row; onClose: () => void }) {
   );
 }
 
+/** 周视图里每天的迷你快速添加输入框 */
+function WeekQuickAdd(props: { date: string }) {
+  const [title, setTitle] = useState('');
+  const { toast } = useUI();
+  const submit = async () => {
+    const v = title.trim();
+    if (!v) return;
+    await createRow('plan_items', { title: v, date: props.date });
+    invalidateTable('plan_items');
+    setTitle('');
+    toast(t('已添加计划事项'));
+  };
+  return (
+    <input
+      className="input small"
+      style={{ marginTop: 6 }}
+      placeholder={t('＋ 给这天添加事项，回车创建')}
+      value={title}
+      onChange={(e) => setTitle(e.target.value)}
+      onKeyDown={(e) => e.key === 'Enter' && submit()}
+    />
+  );
+}
+
 /** 当日复盘卡片（自动保存草稿，顶部“手动保存”会立即提交） */
 export function DailyReviewCard(props: { date: string }) {
   const query = useTable('daily_reviews', { date: props.date });
@@ -247,6 +271,7 @@ export default function TodayPlanPage() {
                     {dayRows.length === 0
                       ? <p className="muted small" style={{ margin: 0 }}>{t('无安排')}</p>
                       : sortPlanItems(dayRows).map((item) => <PlanItemRow key={item.id} item={item} onEdit={setEditing} />)}
+                    <WeekQuickAdd date={d} />
                   </div>
                 );
               })}

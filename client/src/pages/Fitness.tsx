@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { createRow, invalidateTable, Row, todayStr, updateRow } from '../api';
+import { createRow, hardDeleteRow, invalidateTable, Row, todayStr, updateRow } from '../api';
 import { useAddToPlan, useClearOpenParam, useOpenParam, useSoftDelete, useTable } from '../hooks';
 import { useSettings } from '../settings';
 import { t, weekdayCharLabel } from '../i18n';
@@ -63,9 +63,9 @@ function TemplateEditor(props: { template?: Row; exercises: Row[]; onClose: () =
     if (tpl) {
       await updateRow('fitness_templates', tpl.id, { name: name.trim(), weekdays: weekdays.join(',') });
       templateId = tpl.id;
-      // 简化处理：编辑时重建动作列表
+      // 编辑时重建动作列表：旧动作行彻底删除（派生数据，不进回收站）
       for (const e of props.exercises.filter((e) => Number(e.template_id) === tpl.id)) {
-        await updateRow('fitness_template_exercises', e.id, { template_id: null });
+        await hardDeleteRow('fitness_template_exercises', e.id);
       }
     } else {
       const row = await createRow('fitness_templates', { name: name.trim(), weekdays: weekdays.join(',') });

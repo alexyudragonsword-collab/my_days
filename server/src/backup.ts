@@ -3,6 +3,14 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { BACKUP_DIR, DB_PATH, closeDb, getDb, reopenDb } from './db';
 
+/** 带稳定错误码的异常，客户端据此做双语翻译 */
+export function codedError(message: string, code: string, detail?: string): Error {
+  const err = new Error(message) as Error & { code?: string; detail?: string };
+  err.code = code;
+  err.detail = detail;
+  return err;
+}
+
 // 备份元数据（备注、长期保留标记）存放在主数据库之外的 manifest 中，
 // 这样恢复备份覆盖主库时不会丢失备份列表信息。
 const MANIFEST_PATH = path.join(BACKUP_DIR, 'manifest.json');
@@ -129,7 +137,7 @@ export function createBackup(type: 'auto' | 'manual' | 'safety', note?: string):
 }
 
 export function updateBackupMeta(file: string, patch: { note?: string; keep?: boolean }): void {
-  if (!fs.existsSync(path.join(BACKUP_DIR, file))) throw new Error('备份文件不存在');
+  if (!fs.existsSync(path.join(BACKUP_DIR, file))) throw codedError('备份文件不存在', 'BACKUP_MISSING');
   const manifest = readManifest();
   manifest[file] = { ...manifest[file], ...patch };
   writeManifest(manifest);
@@ -184,8 +192,9 @@ export function validateBackupFile(fullPath: string): { ok: boolean; error?: str
 export function restoreBackup(file: string): { safetyBackup: string } {
   const source = path.join(BACKUP_DIR, file);
   const valid = validateBackupFile(source);
-  if (!valid.ok) throw new Error(`备份无效，已取消恢复：${valid.error}`);
-  const safety = createBackup('safety', `恢复 ${file} 前的自动安全备份`);
+  if (!valid.ok) throw codedError(`备份无效，已取消恢复：${valid.error}`, 'BACKUP_INVALID', valid.error);
+  // 备注只存来源备份文件名，界面按类型显示“安全备份”标签，避免向数据写入单一语言文案
+  const safety = createBackup('safety', file);
   closeDb();
   try {
     fs.copyFileSync(source, DB_PATH);

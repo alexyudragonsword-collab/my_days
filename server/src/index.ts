@@ -12,7 +12,7 @@ const PORT = Number(process.env.MY_DAYS_PORT || 5675);
 // 仅监听本机回环地址：局域网内其他设备不可访问
 const HOST = '127.0.0.1';
 
-const clientDist = path.resolve(__dirname, '../../client/dist');
+const clientDist = process.env.MY_DAYS_WEB_DIR || path.resolve(__dirname, '../../client/dist');
 const INSTANCE_ID = randomUUID();
 
 /** 由构建产物的大小和修改时间生成构建标识，供启动器判断后台服务是否为当前版本 */
@@ -34,7 +34,7 @@ app.use(express.json({ limit: '5mb' }));
 app.use('/api', (req, res, next) => {
   const origin = req.headers.origin;
   if (origin && !/^http:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/.test(origin)) {
-    res.status(403).json({ error: '请求来源无效' });
+    res.status(403).json({ error: '请求来源无效', code: 'INVALID_ORIGIN' });
     return;
   }
   next();
@@ -50,7 +50,7 @@ app.post('/api/system/exit', (_req, res) => {
   db.pragma('wal_checkpoint(TRUNCATE)');
   const check = db.pragma('quick_check', { simple: true });
   if (check !== 'ok') {
-    res.status(500).json({ ok: false, error: `数据完整性检查失败：${check}` });
+    res.status(500).json({ ok: false, error: `数据完整性检查失败：${check}`, code: 'INTEGRITY_FAIL', detail: String(check) });
     return;
   }
   res.json({ ok: true });
@@ -72,9 +72,9 @@ app.post('/api/system/open-data-dir', (_req, res) => {
 app.use('/api', api);
 
 // 统一错误处理：写入失败等异常必须以明确的失败状态返回
-app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+app.use((err: Error & { code?: string; detail?: string }, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error(err);
-  res.status(500).json({ error: err.message || '服务器内部错误' });
+  res.status(500).json({ error: err.message || '服务器内部错误', code: err.code, detail: err.detail });
 });
 
 // 生产模式：托管前端构建产物

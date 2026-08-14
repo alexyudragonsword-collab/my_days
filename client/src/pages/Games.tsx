@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { createRow, invalidateTable, Row, todayStr, updateRow } from '../api';
+import { createRow, hardDeleteRow, invalidateTable, Row, todayStr, updateRow } from '../api';
 import { GAME_STATUSES } from '../constants';
 import { useAddToPlan, useClearOpenParam, useOpenParam, useSoftDelete, useTable } from '../hooks';
 import { t } from '../i18n';
@@ -90,7 +90,7 @@ export default function GamesPage() {
   const sessionsQuery = useTable('game_sessions');
   const [editing, setEditing] = useState<Row | null>(null);
   const [name, setName] = useState('');
-  const { toast } = useUI();
+  const { toast, confirm } = useUI();
   const addToPlan = useAddToPlan();
   const softDelete = useSoftDelete();
   const openParam = useOpenParam();
@@ -138,6 +138,15 @@ export default function GamesPage() {
     if (!running) return;
     const start = new Date(String(running.start_time)).getTime();
     const duration = Math.max(1, Math.round((Date.now() - start) / 60000));
+    // 跨天保护：忘记结束会算出离谱的时长，超过 6 小时先确认
+    if (duration > 360) {
+      const ok = await confirm({
+        title: t('结束本次游玩'),
+        body: t('本次计时已超过 {0}，可能是忘记结束了。确认照实记录吗？（也可以在菜单中放弃本次计时）', fmtMinutes(duration)),
+        confirmText: t('照实记录'),
+      });
+      if (!ok) return;
+    }
     await updateRow('game_sessions', running.id, {
       end_time: new Date().toISOString(),
       duration_min: duration,
@@ -190,6 +199,13 @@ export default function GamesPage() {
                         )}
                         <Dropdown>
                           <button onClick={() => setEditing(g)}>{t('编辑 / 更新进度')}</button>
+                          {running && (
+                            <button onClick={async () => {
+                              await hardDeleteRow('game_sessions', running.id);
+                              invalidateTable('game_sessions');
+                              toast(t('已放弃本次计时'));
+                            }}>{t('放弃本次计时')}</button>
+                          )}
                           {GAME_STATUSES.filter((s) => s !== status).map((s) => (
                             <button key={s} onClick={async () => {
                               await updateRow('games', g.id, {

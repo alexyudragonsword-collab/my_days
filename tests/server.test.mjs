@@ -208,6 +208,62 @@ test('AC-029 设置写入后重启仍然生效', async () => {
   assert.equal(data.appearance, 'glass');
 });
 
+
+test('AC-034 自动备份超过 30 份时清理旧备份，长期保留标记不被清理', async () => {
+  const backupsDir = path.join(dataDir, 'backups');
+  // 用当天备份复制出 35 份过去日期的假自动备份
+  const existing = fs.readdirSync(backupsDir).find((f) => f.startsWith('auto-'));
+  assert.ok(existing, '应已有当天自动备份');
+  for (let i = 1; i <= 35; i++) {
+    const mm = String(Math.floor((i - 1) / 28) + 1).padStart(2, '0');
+    const dd = String(((i - 1) % 28) + 1).padStart(2, '0');
+    fs.copyFileSync(path.join(backupsDir, existing), path.join(backupsDir, `auto-2026${mm}${dd}-120000.db`));
+  }
+  // 标记最老的一份为长期保留
+  const keptFile = fs.readdirSync(backupsDir).filter((f) => f.startsWith('auto-2026')).sort()[0];
+  const manifestPath = path.join(backupsDir, 'manifest.json');
+  const manifest = fs.existsSync(manifestPath) ? JSON.parse(fs.readFileSync(manifestPath, 'utf8')) : {};
+  manifest[keptFile] = { keep: true, note: 'keep-me' };
+  fs.writeFileSync(manifestPath, JSON.stringify(manifest));
+  // 删除当天的自动备份并重启服务 → 触发自动备份与清理
+  fs.unlinkSync(path.join(backupsDir, existing));
+  await stopServer();
+  startServer();
+  await waitForHealth();
+  const { data } = await api('GET', '/api/backups');
+  const autos = data.backups.filter((b) => b.type === 'auto');
+  const kept = autos.filter((b) => b.keep);
+  assert.equal(kept.length, 1, '长期保留的备份不被清理');
+  assert.equal(kept[0].file, keptFile);
+  assert.equal(autos.filter((b) => !b.keep).length, 30, '普通自动备份保留 30 份');
+});
+
+test('导入导出闭环：导出 ZIP 可完整导入恢复', async () => {
+  const before = await api('GET', '/api/t/plan_items');
+  const exported = await fetch(`${BASE}/api/export`);
+  const zipBuffer = Buffer.from(await exported.arrayBuffer());
+  // 修改数据后导入，应回到导出时状态
+  await api('POST', '/api/t/plan_items', { title: '导入前新增', date: '2026-08-15' });
+  const res = await fetch(`${BASE}/api/import`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/zip' },
+    body: zipBuffer,
+  });
+  const result = await res.json();
+  assert.equal(res.status, 200);
+  assert.ok(result.imported > 0);
+  assert.ok(result.safetyBackup.startsWith('safety-'));
+  const after = await api('GET', '/api/t/plan_items');
+  assert.equal(after.data.rows.length, before.data.rows.length);
+  assert.ok(!after.data.rows.some((r) => r.title === '导入前新增'));
+  // 垃圾文件被拒绝
+  const bad = await fetch(`${BASE}/api/import`, {
+    method: 'POST', headers: { 'Content-Type': 'application/zip' }, body: Buffer.from('garbage'),
+  });
+  assert.equal(bad.status, 400);
+  assert.equal((await bad.json()).code, 'IMPORT_INVALID');
+});
+
 test('保存并退出接口能安全关闭服务', async () => {
   const res = await api('POST', '/api/system/exit');
   assert.equal(res.status, 200);

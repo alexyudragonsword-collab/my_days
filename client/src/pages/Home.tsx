@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { addDays, createRow, invalidateTable, Row, todayStr, updateRow } from '../api';
 import { routeForRecord } from '../App';
@@ -80,18 +80,26 @@ function Timeline(props: { items: Row[]; onEdit: (item: Row) => void }) {
 
 // ---- 快速备忘 ----
 function MemoPanel() {
-  const memosQuery = useTable('memos', { status: 'active' });
+  const memosQuery = useTable('memos');
   const [text, setText] = useState('');
+  const [showInactive, setShowInactive] = useState(false);
+  const addingRef = useRef(false);
   const softDelete = useSoftDelete();
   const { toast } = useUI();
   const navigate = useNavigate();
 
   const add = async () => {
     const v = text.trim();
-    if (!v) return;
-    await createRow('memos', { content: v, status: 'active' });
-    invalidateTable('memos');
-    setText('');
+    // 回车与失焦可能同时触发，用标志位避免重复提交
+    if (!v || addingRef.current) return;
+    addingRef.current = true;
+    try {
+      await createRow('memos', { content: v, status: 'active' });
+      invalidateTable('memos');
+      setText('');
+    } finally {
+      addingRef.current = false;
+    }
   };
 
   const convert = async (memo: Row, type: 'plan' | 'media' | 'game' | 'food') => {
@@ -130,11 +138,16 @@ function MemoPanel() {
           onBlur={() => text.trim() && add()}
         />
       </div>
-      <QueryView query={memosQuery} isEmpty={(rows) => rows.length === 0}
-        empty={<p className="small muted" style={{ margin: 0 }}>{t('暂无备忘，想到什么就记下来。')}</p>}>
+      <QueryView query={memosQuery} isEmpty={(rows) => rows.filter((m) => m.status === 'active').length === 0 && !showInactive}
+        empty={
+          <div>
+            <p className="small muted" style={{ margin: 0 }}>{t('暂无备忘，想到什么就记下来。')}</p>
+            <InactiveMemosToggle rows={memosQuery.data || []} show={showInactive} setShow={setShowInactive} />
+          </div>
+        }>
         {(rows) => (
           <div>
-            {rows.map((m) => (
+            {rows.filter((m) => m.status === 'active').map((m) => (
               <div className="list-item" key={m.id}>
                 <span className="title">{String(m.content)}</span>
                 <Dropdown>
@@ -151,9 +164,44 @@ function MemoPanel() {
                 </Dropdown>
               </div>
             ))}
+            <InactiveMemosToggle rows={rows} show={showInactive} setShow={setShowInactive} />
           </div>
         )}
       </QueryView>
+    </div>
+  );
+}
+
+/** 已归档 / 已转换备忘：默认折叠，可恢复、可打开转换目标（保留来源，避免重复处理） */
+function InactiveMemosToggle(props: { rows: Row[]; show: boolean; setShow: (v: boolean) => void }) {
+  const navigate = useNavigate();
+  const softDelete = useSoftDelete();
+  const { toast } = useUI();
+  const inactive = props.rows.filter((m) => m.status === 'archived' || m.status === 'converted');
+  if (inactive.length === 0) return null;
+  return (
+    <div style={{ marginTop: 8 }}>
+      <button className="btn small" onClick={() => props.setShow(!props.show)}>
+        {props.show ? '▾' : '▸'} {t('已归档 / 已转换')}（{inactive.length}）
+      </button>
+      {props.show && inactive.map((m) => (
+        <div className="list-item small" key={m.id}>
+          <span className="title muted">{String(m.content)}</span>
+          <span className="badge">{m.status === 'converted' ? t('已转换') : t('已归档')}</span>
+          {m.status === 'converted' && m.converted_type && m.converted_id ? (
+            <button className="btn small" onClick={() => navigate(routeForRecord(String(m.converted_type), Number(m.converted_id)))}>
+              {t('打开目标')}
+            </button>
+          ) : (
+            <button className="btn small" onClick={async () => {
+              await updateRow('memos', m.id, { status: 'active' });
+              invalidateTable('memos');
+              toast(t('已恢复为活动备忘'));
+            }}>{t('恢复')}</button>
+          )}
+          <button className="btn small" onClick={() => softDelete('memos', m.id, '备忘')}>✕</button>
+        </div>
+      ))}
     </div>
   );
 }
@@ -162,7 +210,8 @@ function MemoPanel() {
 function AttentionPanel() {
   const today = todayStr();
   const navigate = useNavigate();
-  const overdueQuery = useTable('plan_items', { date_to: addDays(today, -1) });
+  // 限定 90 天窗口，避免数据积累后全量拉取
+  const overdueQuery = useTable('plan_items', { date_from: addDays(today, -90), date_to: addDays(today, -1) });
   const followupsQuery = useTable('consult_followups', { done: 0 });
   const deliverablesQuery = useTable('consult_deliverables');
   const sessionsQuery = useTable('fitness_sessions', { date: today });
@@ -260,9 +309,9 @@ function SummaryCards() {
   const consultDeliverables = useTable('consult_deliverables');
   const consultFollowups = useTable('consult_followups', { done: 0 });
   const consultComms = useTable('consult_comms');
-  const sessions = useTable('fitness_sessions');
+  const sessions = useTable('fitness_sessions', { date_from: addDays(today, -7), date_to: today });
   const meals = useTable('meals', { date: today });
-  const mealFoods = useTable('meal_foods');
+  const mealFoods = useTable('meal_foods', { since: addDays(today, -2) });
   const games = useTable('games');
   const planItems = useTable('plan_items', { date: today });
 

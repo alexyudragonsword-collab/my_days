@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { createRow, deleteRow, invalidateTable, listRows, restoreFromTrash, Row, todayStr, updateRow } from './api';
+import { createRow, deleteRow, invalidateTable, listRows, queryClient, restoreFromTrash, Row, todayStr, updateRow } from './api';
 import { useUI } from './ui';
 
 /** 查询某张表（带过滤），queryKey 统一为 ['t', table, filters] 便于失效 */
@@ -18,10 +18,12 @@ export function useSoftDelete() {
   return async (table: string, id: number, label = '记录') => {
     await deleteRow(table, id);
     invalidateTable(table);
+    queryClient.invalidateQueries({ queryKey: ['trash'] });
     toast(`${label}已移入回收站`, {
       undo: async () => {
         await restoreFromTrash(table, id);
         invalidateTable(table);
+        queryClient.invalidateQueries({ queryKey: ['trash'] });
       },
     });
   };

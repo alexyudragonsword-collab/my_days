@@ -1,0 +1,57 @@
+name: 持续集成
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name: ${{ matrix.os }} 构建与服务端测试
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
+    steps:
+      - name: 读取源代码
+        uses: actions/checkout@v4
+      - name: 安装 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: 安装依赖
+        run: npm ci
+      - name: 构建并运行服务端集成测试
+        run: npm run verify
+
+  e2e:
+    name: Chromium 端到端验收
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: 读取源代码
+        uses: actions/checkout@v4
+      - name: 安装 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: 安装依赖
+        run: npm ci
+      - name: 安装 Chromium
+        run: npx playwright install --with-deps chromium
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: ''
+      - name: 构建
+        run: npm run build
+      - name: 运行端到端验收
+        run: npm run test:e2e

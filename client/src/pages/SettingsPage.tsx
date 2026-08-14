@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import React from 'react';
 import { apiDelete, apiGet, apiPatch, apiPost, queryClient } from '../api';
-import { useSettings } from '../settings';
+import { APPEARANCES, useSettings } from '../settings';
 import { EmptyState, Field, fmtDateTime, fmtSize, QueryView, useUI } from '../ui';
 
 const TYPE_LABEL: Record<string, string> = { auto: '自动', manual: '手动', safety: '安全备份' };
@@ -26,6 +26,15 @@ function DataFileCard() {
           )
         }
       </QueryView>
+      <div className="row" style={{ marginTop: 8 }}>
+        <button className="btn small" onClick={async () => {
+          try {
+            await apiPost('/api/system/open-data-dir');
+          } catch {
+            /* 无桌面环境时按钮无效果，路径已在上方展示 */
+          }
+        }}>打开数据目录</button>
+      </div>
       <p className="small muted" style={{ marginBottom: 0 }}>
         所有业务数据都保存在上述 SQLite 文件中，可直接在文件系统中复制该文件做额外备份。
       </p>
@@ -159,9 +168,10 @@ function ExportCard() {
     <div className="card">
       <h3>导出数据</h3>
       <p className="small muted">
-        导出全部核心业务记录为 JSON 文件，用于迁移或人工查看。导出不会修改主数据，也不能替代完整备份。
+        导出 ZIP 压缩包，内含机读的全量 JSON 和每个模块一份可用表格软件打开的 CSV，用于迁移或人工查看。
+        导出不会修改主数据，也不能替代完整备份。
       </p>
-      <a className="btn" href="/api/export" download>导出 JSON</a>
+      <a className="btn" href="/api/export" download>导出 ZIP（JSON + CSV）</a>
     </div>
   );
 }
@@ -210,6 +220,36 @@ function TrashCard() {
           </div>
         )}
       </QueryView>
+    </div>
+  );
+}
+
+function AppearanceCard() {
+  const { settings, update } = useSettings();
+  const { toast } = useUI();
+  return (
+    <div className="card">
+      <h3>界面外观 <span className="sub">只改变界面样式，不影响任何业务数据</span></h3>
+      <div className="appearance-grid">
+        {APPEARANCES.map((a) => (
+          <button
+            key={a.key}
+            className={'appearance-option' + (settings.appearance === a.key ? ' selected' : '')}
+            data-preview={a.key}
+            onClick={async () => {
+              await update({ appearance: a.key });
+              toast(`已切换为「${a.label}」外观`);
+            }}
+          >
+            <span className="preview">
+              <span className="p-dot" /><span className="p-bar" /><span className="p-chip" />
+            </span>
+            <strong>{a.label}</strong>
+            <span className="small muted">{a.desc}</span>
+          </button>
+        ))}
+      </div>
+      <p className="small muted" style={{ marginBottom: 0 }}>每种外观都支持下方“主题”里的浅色与深色模式。</p>
     </div>
   );
 }
@@ -283,6 +323,7 @@ export default function SettingsPage() {
       <BackupsCard />
       <ExportCard />
       <TrashCard />
+      <AppearanceCard />
       <PreferencesCard />
     </div>
   );

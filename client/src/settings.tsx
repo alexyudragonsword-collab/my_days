@@ -2,8 +2,11 @@ import { useQuery } from '@tanstack/react-query';
 import React, { createContext, useContext, useEffect } from 'react';
 import { apiPut, queryClient } from './api';
 
+export type Appearance = 'default' | 'glass' | 'notion' | 'brutal';
+
 export interface AppSettings {
   theme: 'light' | 'dark' | 'auto';
+  appearance: Appearance;
   week_start: 0 | 1;
   date_format: 'iso' | 'cn' | 'slash';
   home_summaries: Record<string, boolean>;
@@ -13,12 +16,20 @@ export interface AppSettings {
 
 export const DEFAULT_SETTINGS: AppSettings = {
   theme: 'auto',
+  appearance: 'default',
   week_start: 1,
   date_format: 'iso',
   home_summaries: { media: true, dev: true, consult: true, fitness: true, diet: true, games: true },
   diet_calories: null,
   diet_protein: null,
 };
+
+export const APPEARANCES: { key: Appearance; label: string; desc: string }[] = [
+  { key: 'default', label: '默认', desc: '简洁明快的标准界面' },
+  { key: 'glass', label: '流光玻璃', desc: '环境色、透明材质和柔和空间层级' },
+  { key: 'notion', label: 'Notion 笔记', desc: '紧凑画布、纯平表面和低饱和状态标记' },
+  { key: 'brutal', label: 'Neo-Brutalism', desc: '多色印刷、硬边框和机械反馈' },
+];
 
 interface SettingsContextValue {
   settings: AppSettings;
@@ -44,7 +55,9 @@ export function SettingsProvider(props: { children: React.ReactNode }) {
     } else {
       root.dataset.theme = settings.theme;
     }
-  }, [settings.theme]);
+    // 外观只切换界面样式属性，不涉及任何业务数据
+    root.dataset.appearance = settings.appearance || 'default';
+  }, [settings.theme, settings.appearance]);
 
   const update = async (patch: Partial<AppSettings>) => {
     await apiPut('/api/settings', patch);

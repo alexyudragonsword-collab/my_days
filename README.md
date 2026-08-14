@@ -92,6 +92,19 @@ MyDays/
 - `Ctrl / Command + K` 打开全局搜索，可跨模块搜索并直接跳转到记录。
 - 删除的记录会先进入「数据与设置」页的回收站，可以恢复；永久删除需要再次确认。
 
+## 桌面版（免 Node 安装包）
+
+不想安装 Node.js 的话，可以使用 Electron 桌面版：在仓库的 GitHub Actions「桌面版安装包」工作流（或版本 Release）中下载对应系统的安装包——macOS 为 `.dmg`、Windows 为 `.exe`、Linux 为 `.AppImage`。桌面版与源码版使用相同的数据目录，两种方式可以混用。
+
+> 安装包未经 Apple 公证 / Windows 代码签名，首次打开时系统可能提示"未知开发者"：macOS 右键 → 打开，Windows 点击"仍要运行"即可。
+
+本地构建桌面版：
+
+```bash
+npm run build && node scripts/build-desktop.mjs
+cd desktop && npm install && npx electron-builder
+```
+
 ## 测试与持续集成
 
 ```bash

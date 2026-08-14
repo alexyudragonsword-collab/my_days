@@ -64,6 +64,19 @@ Everything is stored in `data/my_days.db` (SQLite). Backups are independent file
 - **Export**: ZIP with machine-readable JSON plus one CSV per module.
 - **Import**: restore everything from an export ZIP (for migrating to a new computer); fully replaces current data after creating a safety backup.
 
+## Desktop app (no Node.js required)
+
+Prefer not to install Node.js? Download the Electron desktop build from the repo's GitHub Actions "桌面版安装包" workflow (or a versioned Release): `.dmg` for macOS, `.exe` for Windows, `.AppImage` for Linux. The desktop build shares the same data directory as the source version, so you can mix both.
+
+> The installers are not notarized / code-signed. On first launch: macOS — right-click → Open; Windows — click "Run anyway".
+
+Build locally:
+
+```bash
+npm run build && node scripts/build-desktop.mjs
+cd desktop && npm install && npx electron-builder
+```
+
 ## Tests & CI
 
 ```bash

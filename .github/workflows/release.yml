@@ -1,0 +1,63 @@
+name: 桌面版安装包
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: ${{ matrix.os }} 安装包
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            artifact: MyDays-mac
+            pattern: desktop/dist/*.dmg
+          - os: windows-latest
+            artifact: MyDays-windows
+            pattern: desktop/dist/*.exe
+          - os: ubuntu-latest
+            artifact: MyDays-linux
+            pattern: desktop/dist/*.AppImage
+    steps:
+      - name: 读取源代码
+        uses: actions/checkout@v4
+      - name: 安装 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: 安装依赖
+        run: npm ci
+      - name: 构建 Web 与服务端
+        run: npm run build
+      - name: 生成桌面资源
+        run: node scripts/build-desktop.mjs
+      - name: 安装桌面依赖
+        run: npm ci
+        working-directory: desktop
+      - name: 打包安装程序
+        run: npx electron-builder --publish never
+        working-directory: desktop
+        env:
+          # 未配置代码签名证书时跳过 macOS 签名
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - name: 上传安装包
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.pattern }}
+          if-no-files-found: error
+      - name: 附加到 Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ matrix.pattern }}

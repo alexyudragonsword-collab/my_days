@@ -134,5 +134,6 @@ npm run test:e2e  # Chromium 浏览器端到端验收（需要 npx playwright in
 | [docs/API.md](docs/API.md) | REST 接口参考与错误码 |
 | [docs/DATA_MODEL.md](docs/DATA_MODEL.md) | 全部数据表结构与字段语义 |
 | [docs/ACCEPTANCE.md](docs/ACCEPTANCE.md) | 验收标准 → 自动化测试映射表 |
+| [ROADMAP.md](ROADMAP.md) | 候选功能与待办清单（想法的落脚点） |
 | [CHANGELOG.md](CHANGELOG.md) | 版本更新记录 |
 | [CLAUDE.md](CLAUDE.md) | AI 协作开发须知 |

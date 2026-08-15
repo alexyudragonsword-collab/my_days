@@ -26,4 +26,4 @@ CHROMIUM_PATH=<chrome> npx playwright test   # 浏览器 e2e
 
 ## 文档同步
 
-改接口更新 `docs/API.md`；改表结构更新 `docs/DATA_MODEL.md`；影响验收项更新 `docs/ACCEPTANCE.md`；用户可见变化更新 `README.md` + `README.en.md` 与 `CHANGELOG.md`。
+改接口更新 `docs/API.md`；改表结构更新 `docs/DATA_MODEL.md`；影响验收项更新 `docs/ACCEPTANCE.md`；用户可见变化更新 `README.md` + `README.en.md` 与 `CHANGELOG.md`；完成 `ROADMAP.md` 中的候选项后将其从该清单移除。

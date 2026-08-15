@@ -98,4 +98,4 @@ Locally you can point the e2e suite at an existing Chromium with `CHROMIUM_PATH=
 
 ## Project docs
 
-[PRD.md](PRD.md) (v1 requirements, in Chinese) · [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) (architecture & conventions) · [docs/API.md](docs/API.md) · [docs/DATA_MODEL.md](docs/DATA_MODEL.md) · [docs/ACCEPTANCE.md](docs/ACCEPTANCE.md) · [CHANGELOG.md](CHANGELOG.md)
+[PRD.md](PRD.md) (v1 requirements, in Chinese) · [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) (architecture & conventions) · [docs/API.md](docs/API.md) · [docs/DATA_MODEL.md](docs/DATA_MODEL.md) · [docs/ACCEPTANCE.md](docs/ACCEPTANCE.md) · [ROADMAP.md](ROADMAP.md) · [CHANGELOG.md](CHANGELOG.md)

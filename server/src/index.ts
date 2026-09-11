@@ -5,6 +5,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { ensureDailyAutoBackup } from './backup';
 import { closeDb, DATA_DIR, getDb } from './db';
+import { normalizeError } from './errors';
 import { openDirCommand } from './platform';
 import { api } from './routes';
 
@@ -71,10 +72,11 @@ app.post('/api/system/open-data-dir', (_req, res) => {
 
 app.use('/api', api);
 
-// 统一错误处理：写入失败等异常必须以明确的失败状态返回
-app.use((err: Error & { code?: string; detail?: string }, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+// 统一错误处理：写入失败等异常必须以明确的失败状态返回，且一律带稳定错误码
+app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error(err);
-  res.status(500).json({ error: err.message || '服务器内部错误', code: err.code, detail: err.detail });
+  const { status, ...body } = normalizeError(err);
+  res.status(status).json(body);
 });
 
 // 生产模式：托管前端构建产物

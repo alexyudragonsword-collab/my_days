@@ -126,6 +126,16 @@ export const TABLES: TableDef[] = [
     columns: ['meal_id', 'kind', 'food_name', 'portion', 'calories', 'protein'],
   },
   {
+    name: 'meal_templates', module: 'diet', moduleLabel: '饮食计划', label: '餐食模板',
+    titleField: 'name', searchFields: ['name'],
+    columns: ['name', 'meal_type'],
+  },
+  {
+    name: 'meal_template_foods', module: 'diet', moduleLabel: '饮食计划', label: '模板食物',
+    titleField: 'food_name', searchFields: [],
+    columns: ['template_id', 'food_name', 'portion', 'calories', 'protein', 'sort'],
+  },
+  {
     name: 'games', module: 'games', moduleLabel: '游戏娱乐', label: '游戏/娱乐项目',
     titleField: 'name', searchFields: ['name', 'notes', 'next_goal'],
     columns: ['name', 'platform', 'status', 'progress', 'next_goal', 'notes', 'rating', 'completed_date'],

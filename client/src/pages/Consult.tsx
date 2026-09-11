@@ -64,6 +64,90 @@ function CommForm(props: { projectId: number; onDone: () => void }) {
   );
 }
 
+/**
+ * 收入统计：按月汇总沟通记录中已填写的费用与结算状态。
+ * 只做汇总展示，不做发票、账期等完整财务功能（见 ROADMAP“明确不做”）。
+ */
+function IncomeCard(props: { comms: Row[]; projects: Row[]; clients: Row[]; currentClientId: number | null }) {
+  const [scope, setScope] = useState<'all' | 'client'>('all');
+  const clientOfProject = new Map(props.projects.map((p) => [p.id, Number(p.client_id)]));
+
+  const rows = props.comms.filter((c) => {
+    if (c.fee_amount == null || Number(c.fee_amount) === 0) return false;
+    if (scope === 'all') return true;
+    return props.currentClientId != null && clientOfProject.get(Number(c.project_id)) === props.currentClientId;
+  });
+
+  const byMonth = new Map<string, { fee: number; settled: number; count: number; minutes: number }>();
+  for (const c of rows) {
+    const month = String(c.time || '').slice(0, 7);
+    if (!month) continue;
+    const cur = byMonth.get(month) || { fee: 0, settled: 0, count: 0, minutes: 0 };
+    const fee = Number(c.fee_amount) || 0;
+    cur.fee += fee;
+    if (c.settled) cur.settled += fee;
+    cur.count += 1;
+    cur.minutes += Number(c.duration_min) || 0;
+    byMonth.set(month, cur);
+  }
+  const months = [...byMonth.entries()].sort((a, b) => b[0].localeCompare(a[0])).slice(0, 12);
+  const total = months.reduce(
+    (acc, [, v]) => ({ fee: acc.fee + v.fee, settled: acc.settled + v.settled, count: acc.count + v.count, minutes: acc.minutes + v.minutes }),
+    { fee: 0, settled: 0, count: 0, minutes: 0 }
+  );
+  const currentClientName = props.clients.find((c) => c.id === props.currentClientId)?.name;
+
+  return (
+    <div className="card">
+      <div className="row" style={{ justifyContent: 'space-between', marginBottom: 8 }}>
+        <h3 style={{ margin: 0 }}>
+          {t('收入统计')} <span className="sub">{t('按月汇总沟通记录中已填写的费用，最近 12 个月')}</span>
+        </h3>
+        <div className="tabs">
+          <button className={scope === 'all' ? 'active' : ''} onClick={() => setScope('all')}>{t('全部客户')}</button>
+          <button className={scope === 'client' ? 'active' : ''} onClick={() => setScope('client')} disabled={props.currentClientId == null}>
+            {currentClientName ? String(currentClientName) : t('当前客户')}
+          </button>
+        </div>
+      </div>
+      {months.length === 0 ? (
+        <EmptyState icon="💰" text={t('还没有填写费用的沟通记录')} hint={t('在沟通记录里填写费用后，这里会按月汇总')} />
+      ) : (
+        <table className="tbl">
+          <thead>
+            <tr>
+              <th>{t('月份')}</th><th>{t('次数')}</th><th>{t('时长')}</th>
+              <th>{t('费用合计')}</th><th>{t('已结算')}</th><th>{t('未结算')}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {months.map(([month, v]) => (
+              <tr key={month}>
+                <td>{month}</td>
+                <td>{v.count}</td>
+                <td>{v.minutes ? fmtMinutes(v.minutes) : '—'}</td>
+                <td>{v.fee.toLocaleString()}</td>
+                <td>{v.settled.toLocaleString()}</td>
+                <td>{(v.fee - v.settled) > 0
+                  ? <span className="badge warn">{(v.fee - v.settled).toLocaleString()}</span>
+                  : '—'}</td>
+              </tr>
+            ))}
+            <tr>
+              <th>{t('合计')}</th>
+              <th>{total.count}</th>
+              <th>{total.minutes ? fmtMinutes(total.minutes) : '—'}</th>
+              <th>{total.fee.toLocaleString()}</th>
+              <th>{total.settled.toLocaleString()}</th>
+              <th>{(total.fee - total.settled).toLocaleString()}</th>
+            </tr>
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
 export default function ConsultPage() {
   const clientsQuery = useTable('consult_clients');
   const projectsQuery = useTable('consult_projects');
@@ -77,7 +161,8 @@ export default function ConsultPage() {
   const [newProject, setNewProject] = useState('');
   const [newDeliverable, setNewDeliverable] = useState({ name: '', due_date: '' });
   const [newFollowup, setNewFollowup] = useState({ next_time: '', content: '' });
-  const { toast, confirm } = useUI();
+  const [incomeOpen, setIncomeOpen] = useState(false);
+  const { toast, confirm, prompt } = useUI();
   const addToPlan = useAddToPlan();
   const softDelete = useSoftDelete();
   const openParam = useOpenParam();
@@ -147,7 +232,19 @@ export default function ConsultPage() {
         <h2>{t('咨询工作')}</h2>
         <input className="input" style={{ width: 180 }} placeholder={t('添加客户，回车保存')} value={newClient}
           onChange={(e) => setNewClient(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addClient()} />
+        <div className="spacer" />
+        <button className={'btn' + (incomeOpen ? ' primary' : '')} onClick={() => setIncomeOpen((o) => !o)}>
+          {t('收入统计')}
+        </button>
       </div>
+      {incomeOpen && (
+        <IncomeCard
+          comms={commsQuery.data || []}
+          projects={allProjects}
+          clients={clientsQuery.data || []}
+          currentClientId={client?.id ?? null}
+        />
+      )}
       <QueryView
         query={clientsQuery}
         isEmpty={() => clients.length === 0}
@@ -172,7 +269,12 @@ export default function ConsultPage() {
                     <h3 style={{ margin: 0 }}>{String(client.name)}</h3>
                     <div className="row">
                       <button className="btn small" onClick={async () => {
-                        const note = window.prompt(t('客户备注'), String(client.note || ''));
+                        const note = await prompt({
+                          title: t('客户备注'),
+                          label: t('备注'),
+                          multiline: true,
+                          defaultValue: String(client.note || ''),
+                        });
                         if (note !== null) {
                           await updateRow('consult_clients', client.id, { note: note || null });
                           invalidateTable('consult_clients');
@@ -211,7 +313,12 @@ export default function ConsultPage() {
                         <h3 style={{ margin: 0 }}>{String(project.name)} <span className="sub">{t(String(project.status))}</span></h3>
                         <div className="row">
                           <button className="btn small" onClick={async () => {
-                            const req = window.prompt(t('当前需求'), String(project.requirement || ''));
+                            const req = await prompt({
+                              title: t('当前需求'),
+                              label: t('需求描述'),
+                              multiline: true,
+                              defaultValue: String(project.requirement || ''),
+                            });
                             if (req !== null) {
                               await updateRow('consult_projects', project.id, { requirement: req || null });
                               invalidateTable('consult_projects');
@@ -303,8 +410,14 @@ export default function ConsultPage() {
                             ) : null}
                             <Dropdown>
                               <button onClick={async () => {
-                                const nd = window.prompt(t('延期到（YYYY-MM-DD）'), String(d.due_date || addDays(todayStr(), 7)));
-                                if (nd && /^\d{4}-\d{2}-\d{2}$/.test(nd)) {
+                                const nd = await prompt({
+                                  title: t('延期交付'),
+                                  label: t('新的截止日期'),
+                                  inputType: 'date',
+                                  defaultValue: String(d.due_date || addDays(todayStr(), 7)),
+                                  validate: (v) => (/^\d{4}-\d{2}-\d{2}$/.test(v) ? null : t('请选择有效日期')),
+                                });
+                                if (nd) {
                                   await updateRow('consult_deliverables', d.id, { due_date: nd });
                                   invalidateTable('consult_deliverables');
                                   toast(t('已延期'));

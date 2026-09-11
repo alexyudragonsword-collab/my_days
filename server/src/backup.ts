@@ -2,14 +2,7 @@ import Database from 'better-sqlite3';
 import * as fs from 'fs';
 import * as path from 'path';
 import { BACKUP_DIR, DB_PATH, closeDb, getDb, reopenDb } from './db';
-
-/** 带稳定错误码的异常，客户端据此做双语翻译 */
-export function codedError(message: string, code: string, detail?: string): Error {
-  const err = new Error(message) as Error & { code?: string; detail?: string };
-  err.code = code;
-  err.detail = detail;
-  return err;
-}
+import { codedError } from './errors';
 
 // 备份元数据（备注、长期保留标记）存放在主数据库之外的 manifest 中，
 // 这样恢复备份覆盖主库时不会丢失备份列表信息。
@@ -118,9 +111,10 @@ export function createBackup(type: 'auto' | 'manual' | 'safety', note?: string):
     fs.renameSync(tmp, target);
   } catch (e) {
     try { fs.unlinkSync(tmp); } catch { /* 忽略清理失败 */ }
-    status.lastError = e instanceof Error ? e.message : String(e);
+    const reason = e instanceof Error ? e.message : String(e);
+    status.lastError = reason;
     status.lastErrorAt = new Date().toISOString();
-    throw e;
+    throw codedError('创建备份失败', 'BACKUP_FAILED', reason, 500);
   }
   if (note) {
     const manifest = readManifest();
@@ -201,6 +195,9 @@ export function restoreBackup(file: string): { safetyBackup: string } {
     for (const suffix of ['-wal', '-shm']) {
       try { fs.unlinkSync(DB_PATH + suffix); } catch { /* 不存在则忽略 */ }
     }
+  } catch (e) {
+    throw codedError('恢复备份失败，原数据已保留安全备份', 'RESTORE_FAILED',
+      e instanceof Error ? e.message : String(e), 500);
   } finally {
     reopenDb();
   }

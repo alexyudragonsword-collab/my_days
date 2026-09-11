@@ -42,9 +42,24 @@ interface ConfirmOptions {
   confirmText?: string;
   danger?: boolean;
 }
+interface PromptOptions {
+  title: string;
+  label?: string;
+  hint?: React.ReactNode;
+  defaultValue?: string;
+  placeholder?: string;
+  confirmText?: string;
+  /** 输入框类型，例如 date；默认普通文本 */
+  inputType?: string;
+  multiline?: boolean;
+  /** 返回错误文案表示校验不通过，返回空表示通过 */
+  validate?: (value: string) => string | null;
+}
 interface UIContextValue {
   toast: (message: string, opts?: { error?: boolean; undo?: () => void }) => void;
   confirm: (opts: ConfirmOptions) => Promise<boolean>;
+  /** 应用内输入弹窗：取代 window.prompt（Electron 桌面版不支持 window.prompt） */
+  prompt: (opts: PromptOptions) => Promise<string | null>;
 }
 
 const UIContext = createContext<UIContextValue>(null!);
@@ -52,9 +67,62 @@ export const useUI = () => useContext(UIContext);
 
 let toastId = 0;
 
+/** 输入弹窗内容：自带草稿状态与回车提交 */
+function PromptDialog(props: { options: PromptOptions; onDone: (value: string | null) => void }) {
+  const { options } = props;
+  const [value, setValue] = useState(options.defaultValue ?? '');
+  const [error, setError] = useState<string | null>(null);
+
+  const submit = () => {
+    const message = options.validate ? options.validate(value) : null;
+    if (message) {
+      setError(message);
+      return;
+    }
+    props.onDone(value);
+  };
+
+  return (
+    <Modal title={options.title} onClose={() => props.onDone(null)} width={460}>
+      <Field label={options.label ?? ''}>
+        {options.multiline ? (
+          <textarea
+            className="input"
+            autoFocus
+            rows={4}
+            value={value}
+            placeholder={options.placeholder}
+            onChange={(e) => { setValue(e.target.value); setError(null); }}
+          />
+        ) : (
+          <input
+            className="input"
+            autoFocus
+            type={options.inputType || 'text'}
+            value={value}
+            placeholder={options.placeholder}
+            onChange={(e) => { setValue(e.target.value); setError(null); }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') submit();
+              if (e.key === 'Escape') props.onDone(null);
+            }}
+          />
+        )}
+      </Field>
+      {options.hint && <p className="small muted" style={{ marginTop: 0 }}>{options.hint}</p>}
+      {error && <p className="small" style={{ color: 'var(--danger)', marginTop: 0 }}>{error}</p>}
+      <div className="row" style={{ justifyContent: 'flex-end' }}>
+        <button className="btn" onClick={() => props.onDone(null)}>{t('取消')}</button>
+        <button className="btn primary" onClick={submit}>{options.confirmText || t('确定')}</button>
+      </div>
+    </Modal>
+  );
+}
+
 export function UIProvider(props: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const [confirmState, setConfirmState] = useState<(ConfirmOptions & { resolve: (v: boolean) => void }) | null>(null);
+  const [promptState, setPromptState] = useState<(PromptOptions & { resolve: (v: string | null) => void }) | null>(null);
 
   const toast = useCallback((message: string, opts?: { error?: boolean; undo?: () => void }) => {
     const id = ++toastId;
@@ -66,13 +134,22 @@ export function UIProvider(props: { children: React.ReactNode }) {
     return new Promise<boolean>((resolve) => setConfirmState({ ...opts, resolve }));
   }, []);
 
+  const prompt = useCallback((opts: PromptOptions) => {
+    return new Promise<string | null>((resolve) => setPromptState({ ...opts, resolve }));
+  }, []);
+
   const closeConfirm = (v: boolean) => {
     confirmState?.resolve(v);
     setConfirmState(null);
   };
 
+  const closePrompt = (v: string | null) => {
+    promptState?.resolve(v);
+    setPromptState(null);
+  };
+
   return (
-    <UIContext.Provider value={{ toast, confirm }}>
+    <UIContext.Provider value={{ toast, confirm, prompt }}>
       {props.children}
       <div className="toasts">
         {toasts.map((item) => (
@@ -102,6 +179,9 @@ export function UIProvider(props: { children: React.ReactNode }) {
             </button>
           </div>
         </Modal>
+      )}
+      {promptState && (
+        <PromptDialog key={promptState.title} options={promptState} onDone={closePrompt} />
       )}
     </UIContext.Provider>
   );

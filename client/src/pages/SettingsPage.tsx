@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import React, { useRef, useState } from 'react';
 import { apiDelete, apiGet, apiPatch, apiPost, queryClient } from '../api';
 import { t } from '../i18n';
-import { APPEARANCES, useSettings } from '../settings';
+import { APPEARANCES, orderedSummaryKeys, SUMMARY_MODULES, useSettings } from '../settings';
 import { EmptyState, Field, fmtDateTime, fmtSize, QueryView, useUI } from '../ui';
 
 const TYPE_LABEL: Record<string, string> = { auto: '自动', manual: '手动', safety: '安全备份' };
@@ -45,7 +45,7 @@ function DataFileCard() {
 
 function BackupsCard() {
   const query = useQuery({ queryKey: ['backups'], queryFn: () => apiGet<any>('/api/backups') });
-  const { toast, confirm } = useUI();
+  const { toast, confirm, prompt } = useUI();
 
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ['backups'] });
@@ -120,7 +120,12 @@ function BackupsCard() {
                       <td>
                         {b.note || <span className="muted">—</span>}{' '}
                         <button className="btn small" onClick={async () => {
-                          const note = window.prompt(t('备份备注 / 名称'), b.note || '');
+                          const note = await prompt({
+                            title: t('备份备注 / 名称'),
+                            label: t('备注'),
+                            defaultValue: b.note || '',
+                            placeholder: t('例如：升级前的存档'),
+                          });
                           if (note !== null) {
                             await apiPatch(`/api/backups/${encodeURIComponent(b.file)}`, { note });
                             refresh();
@@ -306,10 +311,18 @@ function AppearanceCard() {
 function PreferencesCard() {
   const { settings, update } = useSettings();
   const { toast } = useUI();
-  const MODULES: [string, string][] = [
-    ['media', '自媒体'], ['dev', '开发工作'], ['consult', '咨询工作'],
-    ['fitness', '健身计划'], ['diet', '饮食计划'], ['games', '游戏娱乐'],
-  ];
+  const order = orderedSummaryKeys(settings.home_summary_order);
+  const labelOf = (key: string) => SUMMARY_MODULES.find((m) => m.key === key)?.label || key;
+
+  // 交换相邻两项：只改界面顺序偏好，不触碰任何业务数据
+  const move = async (index: number, delta: number) => {
+    const next = [...order];
+    const target = index + delta;
+    if (target < 0 || target >= next.length) return;
+    [next[index], next[target]] = [next[target], next[index]];
+    await update({ home_summary_order: next });
+  };
+
   return (
     <div className="card">
       <h3>{t('使用偏好')}</h3>
@@ -353,10 +366,10 @@ function PreferencesCard() {
           </select>
         </Field>
       </div>
-      <Field label={t('首页显示的模块摘要')}>
-        <div className="row wrap">
-          {MODULES.map(([key, label]) => (
-            <label key={key} className="row small" style={{ gap: 4 }}>
+      <Field label={t('首页模块摘要：显示与顺序')}>
+        {order.map((key, index) => (
+          <div className="list-item small" key={key}>
+            <label className="row" style={{ gap: 6, flex: 1 }}>
               <input
                 type="checkbox"
                 checked={settings.home_summaries[key] !== false}
@@ -364,10 +377,15 @@ function PreferencesCard() {
                   await update({ home_summaries: { ...settings.home_summaries, [key]: e.target.checked } });
                 }}
               />
-              {t(label)}
+              {t(labelOf(key))}
             </label>
-          ))}
-        </div>
+            <button className="btn small" disabled={index === 0} title={t('上移')} onClick={() => move(index, -1)}>↑</button>
+            <button className="btn small" disabled={index === order.length - 1} title={t('下移')} onClick={() => move(index, 1)}>↓</button>
+          </div>
+        ))}
+        <p className="small muted" style={{ margin: '6px 0 0' }}>
+          {t('顺序与显隐只改变首页界面，不会复制、迁移或修改任何业务数据。')}
+        </p>
       </Field>
     </div>
   );

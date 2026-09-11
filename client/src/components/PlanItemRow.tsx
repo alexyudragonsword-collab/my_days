@@ -5,7 +5,7 @@ import { routeForRecord } from '../App';
 import { priorityBadgeClass, SOURCE_INFO } from '../constants';
 import { usePlanItemActions, useSoftDelete } from '../hooks';
 import { t } from '../i18n';
-import { Dropdown, fmtMinutes } from '../ui';
+import { Dropdown, fmtMinutes, useUI } from '../ui';
 
 /** 今日计划事项行：首页与今日计划页共用 */
 export function PlanItemRow(props: {
@@ -15,6 +15,7 @@ export function PlanItemRow(props: {
 }) {
   const { item } = props;
   const { setStatus, postpone } = usePlanItemActions();
+  const { prompt } = useUI();
   const softDelete = useSoftDelete();
   const navigate = useNavigate();
   const status = String(item.status);
@@ -23,8 +24,14 @@ export function PlanItemRow(props: {
   const source = item.source_module ? SOURCE_INFO[String(item.source_module)] : undefined;
 
   const postponeToDate = async () => {
-    const d = window.prompt(t('延期到哪一天？（格式 YYYY-MM-DD）'), addDays(todayStr(), 1));
-    if (d && /^\d{4}-\d{2}-\d{2}$/.test(d)) await postpone(item, d);
+    const d = await prompt({
+      title: t('延期到指定日期'),
+      label: t('新的日期'),
+      inputType: 'date',
+      defaultValue: addDays(todayStr(), 1),
+      validate: (v) => (/^\d{4}-\d{2}-\d{2}$/.test(v) ? null : t('请选择有效日期')),
+    });
+    if (d) await postpone(item, d);
   };
 
   return (

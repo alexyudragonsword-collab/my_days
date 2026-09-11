@@ -131,7 +131,7 @@ export default function DevPage() {
   const [newItem, setNewItem] = useState({ title: '', type: '功能', priority: '中' });
   const [newMilestone, setNewMilestone] = useState({ name: '', target_date: '' });
   const [newLog, setNewLog] = useState('');
-  const { toast, confirm } = useUI();
+  const { toast, confirm, prompt } = useUI();
   const addToPlan = useAddToPlan();
   const softDelete = useSoftDelete();
   const openParam = useOpenParam();
@@ -195,7 +195,8 @@ export default function DevPage() {
       await navigator.clipboard.writeText(path);
       toast(t('目录路径已复制'));
     } catch {
-      window.prompt(t('请手动复制目录路径：'), path);
+      // 剪贴板不可用（非安全上下文等）时，弹窗展示完整路径供手动复制
+      await prompt({ title: t('请手动复制目录路径：'), label: t('本地目录'), defaultValue: path, confirmText: t('关闭') });
     }
   };
 

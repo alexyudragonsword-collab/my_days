@@ -12,8 +12,27 @@
 { "error": "人类可读消息（中文）", "code": "稳定错误码", "detail": "可选补充" }
 ```
 
-客户端按 `code` 做双语翻译（`client/src/i18n.tsx` 的 `SERVER_ERRORS`）。当前错误码：
-`NOT_FOUND`、`UNKNOWN_TABLE`、`NO_FIELDS`、`BACKUP_KEPT`、`BACKUP_MISSING`、`BACKUP_INVALID`、`INTEGRITY_FAIL`、`INVALID_ORIGIN`、`IMPORT_INVALID`、`IMPORT_NEWER_SCHEMA`。
+**所有**失败响应都带稳定 `code`：错误码清单定义在 `server/src/errors.ts`，未登记的底层异常（如文件系统错误）统一归一为 `INTERNAL_ERROR`，原始信息放入 `detail`。客户端按 `code` 做双语翻译（`client/src/i18n.tsx` 的 `SERVER_ERRORS`），两侧一致性由 `tests/server.test.mjs` 校验。
+
+| 错误码 | HTTP | 含义 |
+| --- | --- | --- |
+| `NOT_FOUND` | 404 | 记录不存在或已删除 |
+| `UNKNOWN_TABLE` | 404 / 400 | 表名未在 `tables.ts` 注册 |
+| `NO_FIELDS` | 400 | PATCH 没有可更新字段 |
+| `BAD_REQUEST` | 400 | 请求参数或 JSON 体无效（含中间件抛出的解析错误） |
+| `INVALID_ORIGIN` | 403 | 跨站来源 |
+| `BACKUP_KEPT` | 400 | 备份已标记长期保留，不能直接删除 |
+| `BACKUP_MISSING` | 400 | 备份文件不存在 |
+| `BACKUP_INVALID` | 400 | 备份文件损坏，已拒绝恢复 |
+| `BACKUP_FAILED` | 500 | 创建备份失败 |
+| `RESTORE_FAILED` | 500 | 覆盖主库失败（安全备份已保留） |
+| `INTEGRITY_FAIL` | 500 | `quick_check` 未通过 |
+| `IMPORT_INVALID` | 400 | 导入文件不是本应用的导出 ZIP |
+| `IMPORT_NEWER_SCHEMA` | 400 | 导入数据来自更新版本 |
+| `IMPORT_FAILED` | 500 | 导入事务失败（已回滚，当前数据未变） |
+| `EXPORT_FAILED` | 500 | 导出失败 |
+| `PAYLOAD_TOO_LARGE` | 413 | 请求体超过上限 |
+| `INTERNAL_ERROR` | 500 | 未归类的服务端异常 |
 
 ## 通用业务表 CRUD：`/api/t/<table>`
 
@@ -40,7 +59,44 @@
 
 ## 搜索
 
-`GET /api/search?q=<关键词>` → `{ groups: [{ module, moduleLabel, results: [{ table, label, id, title }] }] }`。按注册表 `searchFields` 做 LIKE 匹配，每表最多 20 条。
+`GET /api/search?q=<关键词>` → `{ groups: [{ module, moduleLabel, results: [{ table, label, id, title }] }], mode }`，每表最多 20 条。
+
+- `mode: "fts"`：关键词 ≥ 3 个字符时走 SQLite FTS5 索引（`search_fts`，trigram 分词器，支持中文任意位置子串匹配），按相关度取候选后回表过滤软删除记录。
+- `mode: "like"`：关键词不足 3 个字符时回退为 `LIKE` 查询（trigram 索引以三字符为单位，短词无法命中）。
+- 索引由数据库触发器与业务表同步，新增可搜索表时需在迁移中补触发器（见 `docs/DEVELOPMENT.md`）。
+
+## 首页“需要关注”
+
+`GET /api/home/attention?today=YYYY-MM-DD` → `{ items: [{ key, table, id, title, reason, args, level }], today }`。
+
+服务端跨表聚合逾期计划、临期跟进与交付、当日未完成训练、已到计划发布日期的内容。`today` 缺省时用服务端本地日期；`reason` 为原因代码（如 `PLAN_OVERDUE`、`DELIVERABLE_DUE`），文案由客户端按当前语言渲染，`args` 为占位符参数；`level` 为 `danger` / `warn`。
+
+## 统计报表
+
+`GET /api/report?from=YYYY-MM-DD&to=YYYY-MM-DD` → 区间汇总：
+
+```json
+{
+  "from": "...", "to": "...",
+  "plan": { "total": 0, "done": 0, "pending": 0, "cancelled": 0, "postponed": 0,
+            "rate": 0, "plannedMinutes": 0, "doneMinutes": 0 },
+  "daily": [{ "date": "...", "done": 0, "total": 0 }],
+  "modules": {
+    "games": { "minutes": 0, "sessions": 0 },
+    "consult": { "minutes": 0, "comms": 0, "fee": 0, "settledFee": 0 },
+    "fitness": { "sessions": 0, "completed": 0, "sets": 0, "volume": 0 },
+    "media": { "published": 0 },
+    "dev": { "logs": 0, "itemsDone": 0 },
+    "diet": { "days": 0, "avgCalories": 0, "avgProtein": 0 },
+    "body": { "first": 0, "last": 0, "count": 0 }
+  }
+}
+```
+
+- `plan.rate` 的分母排除已取消 / 已延期事项。
+- `modules.dev.itemsDone` 没有完成时间字段，按 `updated_at` 近似统计（界面已标注）。
+- `modules.body` 在区间内没有体重记录时为 `null`。
+- 区间非法（格式错误或 `from > to`）返回 400 `BAD_REQUEST`。
 
 ## 设置
 
@@ -60,7 +116,7 @@
 | `POST /api/backups` | 创建手动备份（`VACUUM INTO` 一致快照），body 可带 `{ note }` |
 | `PATCH /api/backups/<file>` | 更新 `{ note?, keep? }`（存于主库外的 manifest.json） |
 | `DELETE /api/backups/<file>` | 删除备份文件；`keep` 标记的返回 400 `BACKUP_KEPT` |
-| `POST /api/backups/<file>/restore` | 恢复：校验完整性与核心表 → 先建 safety 备份 → 覆盖主库 → 重开连接。返回 `{ ok, safetyBackup }`；无效备份 500 `BACKUP_INVALID` 且不动当前数据 |
+| `POST /api/backups/<file>/restore` | 恢复：校验完整性与核心表 → 先建 safety 备份 → 覆盖主库 → 重开连接。返回 `{ ok, safetyBackup }`；无效备份 400 `BACKUP_INVALID` 且不动当前数据 |
 
 自动备份：服务启动时与每小时检查，当天无自动备份则创建；普通自动备份保留最近 30 份，`keep` 的不清理。
 

@@ -12,8 +12,27 @@ export interface AppSettings {
   week_start: 0 | 1;
   date_format: 'iso' | 'cn' | 'slash';
   home_summaries: Record<string, boolean>;
+  /** 首页模块摘要卡片的展示顺序（只影响界面，不改动业务数据） */
+  home_summary_order: string[];
   diet_calories: number | null;
   diet_protein: number | null;
+}
+
+/** 首页可展示的模块摘要及其默认顺序 */
+export const SUMMARY_MODULES: { key: string; label: string }[] = [
+  { key: 'media', label: '自媒体' },
+  { key: 'dev', label: '开发工作' },
+  { key: 'consult', label: '咨询工作' },
+  { key: 'fitness', label: '健身计划' },
+  { key: 'diet', label: '饮食计划' },
+  { key: 'games', label: '游戏娱乐' },
+];
+
+/** 按偏好顺序返回模块 key；未登记的模块补在末尾，避免新增模块后不显示 */
+export function orderedSummaryKeys(order: string[] | undefined): string[] {
+  const known = SUMMARY_MODULES.map((m) => m.key);
+  const seen = (order || []).filter((k) => known.includes(k));
+  return [...seen, ...known.filter((k) => !seen.includes(k))];
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -23,6 +42,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   week_start: 1,
   date_format: 'iso',
   home_summaries: { media: true, dev: true, consult: true, fitness: true, diet: true, games: true },
+  home_summary_order: ['media', 'dev', 'consult', 'fitness', 'diet', 'games'],
   diet_calories: null,
   diet_protein: null,
 };

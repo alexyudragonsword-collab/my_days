@@ -27,12 +27,24 @@ jobs:
           - os: macos-latest
             artifact: MyDays-mac
             pattern: desktop/dist/*.dmg
+            # 自动更新需要 electron-updater 的元数据文件一并发布到 Release
+            release_files: |
+              desktop/dist/*.dmg
+              desktop/dist/*.blockmap
+              desktop/dist/latest-mac.yml
           - os: windows-latest
             artifact: MyDays-windows
             pattern: desktop/dist/*.exe
+            release_files: |
+              desktop/dist/*.exe
+              desktop/dist/*.blockmap
+              desktop/dist/latest.yml
           - os: ubuntu-latest
             artifact: MyDays-linux
             pattern: desktop/dist/*.AppImage
+            release_files: |
+              desktop/dist/*.AppImage
+              desktop/dist/latest-linux.yml
     steps:
       - name: 读取源代码
         uses: actions/checkout@v4
@@ -66,4 +78,4 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: ${{ matrix.pattern }}
+          files: ${{ matrix.release_files }}

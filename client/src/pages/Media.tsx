@@ -5,6 +5,9 @@ import { useAddToPlan, useClearOpenParam, useOpenParam, useSoftDelete, useTable 
 import { t } from '../i18n';
 import { Drawer, Dropdown, EmptyState, Field, QueryView, useUI } from '../ui';
 
+/** 平台筛选中代表“平台字段为空”的内部取值 */
+const NO_PLATFORM = '__none__';
+
 function MediaEditor(props: { item: Row; onClose: () => void }) {
   const it = props.item;
   const [form, setForm] = useState({
@@ -95,8 +98,9 @@ export default function MediaPage() {
   const query = useTable('media_contents', { archived: 0 });
   const [editing, setEditing] = useState<Row | null>(null);
   const [quick, setQuick] = useState('');
+  const [platform, setPlatform] = useState('');
   const [dragOver, setDragOver] = useState<string | null>(null);
-  const { toast, confirm } = useUI();
+  const { toast, confirm, prompt } = useUI();
   const addToPlan = useAddToPlan();
   const softDelete = useSoftDelete();
   const openParam = useOpenParam();
@@ -130,7 +134,13 @@ export default function MediaPage() {
   };
 
   const markPublished = async (item: Row) => {
-    const link = window.prompt(t('发布链接（可留空）'), String(item.publish_link || ''));
+    const link = await prompt({
+      title: t('标记为已发布'),
+      label: t('发布链接（可留空）'),
+      defaultValue: String(item.publish_link || ''),
+      placeholder: t('发布后粘贴链接'),
+    });
+    if (link === null) return;
     await updateRow('media_contents', item.id, {
       stage: '已发布',
       actual_date: String(item.actual_date || '') || todayStr(),
@@ -147,6 +157,13 @@ export default function MediaPage() {
     toast(t('已归档'));
   };
 
+  // 平台筛选项由现有内容归纳得出，不需要预先维护平台清单
+  const platforms = Array.from(
+    new Set((query.data || []).map((r) => String(r.platform || '').trim() || NO_PLATFORM))
+  ).sort();
+  const matchPlatform = (row: Row) =>
+    !platform || (String(row.platform || '').trim() || NO_PLATFORM) === platform;
+
   return (
     <div>
       <div className="page-head">
@@ -159,6 +176,16 @@ export default function MediaPage() {
           onChange={(e) => setQuick(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && addIdea()}
         />
+        <div className="spacer" />
+        <label className="row small muted" style={{ gap: 6 }}>
+          {t('平台')}
+          <select className="input" style={{ width: 140 }} value={platform} onChange={(e) => setPlatform(e.target.value)}>
+            <option value="">{t('全部平台')}</option>
+            {platforms.map((p) => (
+              <option key={p} value={p}>{p === NO_PLATFORM ? t('未填写平台') : p}</option>
+            ))}
+          </select>
+        </label>
       </div>
       <QueryView
         query={query}
@@ -167,6 +194,10 @@ export default function MediaPage() {
           action={<button className="btn primary" onClick={() => { setQuick(t('我的第一个灵感')); }}>{t('先记录一个灵感')}</button>} />}
       >
         {(rows) => (
+          <>
+          {platform && rows.filter(matchPlatform).length === 0 && (
+            <p className="small muted">{t('该平台下暂时没有内容，可切换回「全部平台」。')}</p>
+          )}
           <div className="kanban">
             {MEDIA_STAGES.map((stage) => (
               <div
@@ -182,8 +213,8 @@ export default function MediaPage() {
                   if (item && item.stage !== stage) await moveStage(item, stage);
                 }}
               >
-                <h4>{t(stage)}（{rows.filter((r) => r.stage === stage).length}）</h4>
-                {rows.filter((r) => r.stage === stage).map((item) => (
+                <h4>{t(stage)}（{rows.filter((r) => r.stage === stage && matchPlatform(r)).length}）</h4>
+                {rows.filter((r) => r.stage === stage && matchPlatform(r)).map((item) => (
                   <div
                     key={item.id}
                     className="kanban-card"
@@ -215,6 +246,7 @@ export default function MediaPage() {
               </div>
             ))}
           </div>
+          </>
         )}
       </QueryView>
       {editing && <MediaEditor item={editing} onClose={() => setEditing(null)} />}

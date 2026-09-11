@@ -59,4 +59,13 @@
 
 ## 本项目硬性约定（改代码前必读）
 
-架构与完整约定见 `docs/DEVELOPMENT.md`；速查：i18n 用 `t('中文')` 且词典补英文、枚举以中文规范值存库；表结构变更只新增 `server/migrations/NNN_xxx.sql` 并在 `tables.ts` 注册；业务删除走软删除；保持 127.0.0.1 监听与 Origin 校验；外观/语言/主题切换不得触碰业务数据；路径一律走 `MY_DAYS_*` 环境变量。文档同步：改接口更新 `docs/API.md`、改表更新 `docs/DATA_MODEL.md`、用户可见变化更新 README 双语版与 `CHANGELOG.md`、完成 `ROADMAP.md` 候选项后从清单移除。
+架构与完整约定见 `docs/DEVELOPMENT.md`；速查：
+
+- **i18n**：界面文字一律 `t('中文')` 并在 `i18n.tsx` 词典补英文（`npm run verify` 会跑 `scripts/check-i18n.mjs` 卡住漏补）；业务枚举以中文规范值存库，只在显示层翻译。
+- **数据库**：表结构变更只新增 `server/migrations/NNN_xxx.sql`，并在 `tables.ts` 注册；可搜索的新表要在迁移里补 `search_fts` 的三个触发器，否则搜不到且不报错。
+- **删除**：业务记录走软删除（回收站），派生数据用 `hardDeleteRow`。
+- **错误**：服务端所有失败响应都带稳定 `code`（清单在 `server/src/errors.ts`，同时登记到客户端 `SERVER_ERRORS`）；跨语言动态文案由服务端回代码 + 参数、客户端渲染。
+- **弹窗**：不要用 `window.prompt` / `alert`（Electron 不支持），统一用 `useUI()` 的 `prompt()` / `confirm()`。
+- **安全与边界**：保持 127.0.0.1 监听与 Origin 校验；外观 / 语言 / 主题切换不得触碰业务数据；路径一律走 `MY_DAYS_*` 环境变量。
+
+文档同步：改接口更新 `docs/API.md`、改表更新 `docs/DATA_MODEL.md`、新增自动化覆盖更新 `docs/ACCEPTANCE.md`、用户可见变化更新 README 双语版与 `CHANGELOG.md`、完成 `ROADMAP.md` 候选项后从清单移除。

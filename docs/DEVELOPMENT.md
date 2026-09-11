@@ -9,8 +9,9 @@ my_days/
 ├── server/                 # 后端（Express + better-sqlite3，全 TypeScript）
 │   ├── src/
 │   │   ├── index.ts        # 入口：监听 127.0.0.1、Origin 校验、健康检查、系统接口、静态托管
-│   │   ├── routes.ts       # 全部 REST 路由：通用 CRUD、搜索、回收站、备份、导入导出
+│   │   ├── routes.ts       # 全部 REST 路由：通用 CRUD、搜索、需要关注、统计、回收站、备份、导入导出
 │   │   ├── tables.ts       # ★ 业务表注册中心（见 §3）
+│   │   ├── errors.ts       # ★ 稳定错误码清单与异常归一（见 §5.4）
 │   │   ├── db.ts           # 打开数据库、执行迁移、checkpoint
 │   │   ├── backup.ts       # 备份创建/校验/恢复/清理，manifest 管理
 │   │   └── platform.ts     # 平台标准数据目录、打开目录命令
@@ -25,8 +26,8 @@ my_days/
 │       ├── constants.ts    # 枚举规范值与来源模块映射
 │       ├── ui.tsx          # Modal/Drawer/Toast/确认/空态/下拉菜单
 │       ├── styles.css      # 全局样式 + 四种外观皮肤（见 §6）
-│       └── pages/          # 九个页面
-├── scripts/                # 启动器（start-app.mjs）、桌面打包（build-desktop.mjs）、e2e 服务
+│       └── pages/          # 十个页面（含统计报表）
+├── scripts/                # 启动器、桌面打包、图标生成（make-icons.mjs）、i18n 检查、e2e 服务
 ├── desktop/                # Electron 壳与 electron-builder 配置
 ├── tests/                  # 服务端集成测试（node:test）+ Playwright e2e
 └── docs/                   # 本目录
@@ -41,7 +42,9 @@ npm run build          # server tsc + client vite build
 npm start              # 生产模式（单进程托管 API + 前端，:5675）
 npm run app:start      # 启动器（后台运行 + 自动开浏览器）
 npm test               # 服务端集成测试（先 build）
-npm run verify         # build + test
+npm run verify         # build + i18n 词典检查 + test
+node scripts/check-i18n.mjs             # 单独检查词典完整性
+npm run icons                           # 重新生成桌面版图标与托盘图标
 CHROMIUM_PATH=... npx playwright test   # 浏览器 e2e（CI 里用 playwright install）
 node scripts/build-desktop.mjs          # 生成桌面版资源（先 build）
 ```
@@ -55,9 +58,12 @@ node scripts/build-desktop.mjs          # 生成桌面版资源（先 build）
 2. **注册**：在 `tables.ts` 的 `TABLES` 数组中添加定义——`name`（表名即 API 路径 `/api/t/<name>`）、
    `module`/`moduleLabel`（搜索分组）、`label`、`titleField`（搜索与回收站显示的标题字段）、
    `searchFields`（参与全局搜索的字段，空数组则不进搜索）、`columns`（允许读写的业务字段白名单）。
-3. **前端**：用 `useTable('<name>', filters)` 查询、`createRow/updateRow/deleteRow` 写入；
+3. **搜索索引**：若该表有 `searchFields`，迁移里要同时建三个触发器
+   （`<表名>_fts_ai` / `_fts_au` / `_fts_ad`）把字段写入 `search_fts`，参照 `002_search_fts.sql`
+   与 `003_meal_templates.sql`；漏建触发器的后果是该表搜不到（不报错）。
+4. **前端**：用 `useTable('<name>', filters)` 查询、`createRow/updateRow/deleteRow` 写入；
    界面文字全部过 `t()` 并在 `i18n.tsx` 词典中补英文（见 §5）。
-4. 若记录可"加入今日计划"，在 `tables.ts` 的 `SOURCE_TABLES` 和 `client/src/constants.ts`
+5. 若记录可"加入今日计划"，在 `tables.ts` 的 `SOURCE_TABLES` 和 `client/src/constants.ts`
    的 `SOURCE_INFO` 中登记来源键 → 表的映射。
 
 删除语义：`DELETE /api/t/<name>/:id` 是软删除（进回收站）；派生数据（如模板动作行）用
@@ -79,12 +85,18 @@ node scripts/build-desktop.mjs          # 生成桌面版资源（先 build）
 2. **业务枚举值以中文规范值存库**（如 `未开始`、`灵感`、`早餐`）。显示时用 `t(value)` 翻译，
    `<option>` 必须显式写 `value={规范值}`，翻译只放在标签位置——**绝不能把英文写进数据库**。
 3. 带参数用 `{0} {1}` 占位：`t('已延期到 {0}', date)`。
-4. 服务端不做翻译：错误响应带稳定 `code`（如 `NOT_FOUND`），客户端 `serverErrorMessage()`
-   查 `SERVER_ERRORS` 映射后再走词典；新增服务端错误要同时加 code、中文文案和英文词条。
+4. 服务端不做翻译：**所有**失败响应都带稳定 `code`。错误码清单在 `server/src/errors.ts`，
+   用 `codedError(message, code, detail, status)` 抛出；未登记的底层异常由 `normalizeError()`
+   归一为 `INTERNAL_ERROR`。新增错误码要同时加进 `errors.ts` 和 `i18n.tsx` 的 `SERVER_ERRORS`
+   （两侧一致性由 `tests/server.test.mjs` 校验）。跨语言的动态文案同理：服务端只回代码 + 参数
+   （如首页"需要关注"的 `reason` / `args`），文案在客户端渲染。
+   `node scripts/check-i18n.mjs` 会扫描全部 `t('中文')` 调用，漏补词典时 `npm run verify` 直接失败。
 5. 语言由 `SettingsProvider` 在渲染子树前 `setLang()` 设定，切换语言整页重载，
    因此组件直接用模块级 `t()` 即可，不需要订阅。
 6. **小心变量遮蔽**：不要写 `const t = ...` 或 `.map((t) => ...)`，会遮蔽翻译函数（历史上已踩过三次）。
 7. 星期、时长有专用函数：`weekdayName()` / `weekdayCharLabel()` / `fmtMinutes()`。
+8. **不要用 `window.prompt` / `window.alert`**：Electron 桌面版不实现它们。统一用
+   `useUI()` 的 `prompt()` / `confirm()`（`ui.tsx`，返回 Promise，支持校验与多行输入）。
 
 ## 6. 界面外观（皮肤）
 
@@ -105,9 +117,22 @@ node scripts/build-desktop.mjs          # 生成桌面版资源（先 build）
   `backups/manifest.json`（恢复覆盖主库时不丢失）；恢复前自动建 safety 备份并校验目标文件。
 - **启动器**（`scripts/start-app.mjs`）：健康检查复用已运行服务（比对 buildId）、`O_EXCL`
   启动锁防并发、旧版本服务先安全退出（PID 身份验证，不误杀他人进程）。
+- **全局搜索**：`search_fts`（FTS5 + trigram 分词器）由触发器与业务表同步，支持中文任意位置
+  子串匹配；不足 3 个字符的关键词自动回退 `LIKE`（trigram 以三字符为单位）。软删除不维护索引，
+  查询时回表按 `deleted_at` 过滤——因此恢复回收站记录无需重建索引。
+- **跨表聚合**：首页"需要关注"（`/api/home/attention`）与统计报表（`/api/report`）在服务端聚合，
+  客户端只渲染。客户端传本机日期 `today`，避免服务端时区与用户不一致。
+  任一业务表写入后，`invalidateTable()` 会顺带失效 `['attention']` 与 `['report']` 查询缓存。
 - **桌面版**：esbuild 把服务端打成 `desktop/bundle/server.cjs`（`better-sqlite3` external，
   由 electron-builder 按 Electron ABI 重建）；服务端用 `MY_DAYS_MIGRATIONS_DIR` /
   `MY_DAYS_WEB_DIR` 环境变量定位资源。数据目录与源码版一致（`platform.ts`）。
+  托盘菜单提供"关闭窗口时保留在托盘""开机自启""检查更新"（均默认关闭 / 手动触发），
+  外壳偏好写在 Electron userData 的 `desktop-prefs.json`，不混入业务数据。
+  自动更新用 `electron-updater` 对接 GitHub Releases：Windows / Linux 自动下载后询问重启，
+  macOS 因安装包未公证只提示前往发布页手动下载。发版需要 `desktop/package.json` 的
+  `version` 与 tag 一致，且 Release 里带上 `latest*.yml`（`release.yml` 已配置）。
+- **图标**：`npm run icons` 由 `scripts/make-icons.mjs` 生成（无第三方依赖，手写 PNG 编码），
+  产物 `desktop/build/icon.png`（electron-builder 据此生成各平台图标）与 `desktop/assets/tray*.png`。
 
 ## 8. 测试
 
@@ -122,7 +147,8 @@ node scripts/build-desktop.mjs          # 生成桌面版资源（先 build）
 ## 9. 修改代码的硬性检查单
 
 - [ ] 新界面文字过 `t()` 且词典有英文？枚举 `<option>` 带规范值 `value`？
-- [ ] 新表/新字段走了新迁移文件且在 `tables.ts` 注册？
+- [ ] 新表/新字段走了新迁移文件且在 `tables.ts` 注册？可搜索表补了 FTS 触发器？
+- [ ] 新的服务端错误带稳定 `code` 且客户端词典已登记？
 - [ ] 删除走软删除（或派生数据用 `hardDeleteRow`）？
 - [ ] 不破坏 127.0.0.1 监听与 Origin 校验？
 - [ ] `npm run verify` 与 e2e 全绿？

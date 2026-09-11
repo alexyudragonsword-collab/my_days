@@ -11,8 +11,9 @@
 
 | 表 | 字段与说明 |
 | --- | --- |
-| `settings` | `key`（主键）、`value`（JSON 字符串）。存主题、外观、语言、每周起始日、日期格式、首页摘要开关、饮食目标（`diet_calories`/`diet_protein`）等 |
+| `settings` | `key`（主键）、`value`（JSON 字符串）。存主题、外观、语言、每周起始日、日期格式、首页摘要开关与顺序（`home_summaries` / `home_summary_order`）、饮食目标（`diet_calories`/`diet_protein`）等 |
 | `schema_migrations` | `version`（迁移文件名）、`applied_at` |
+| `search_fts` 全局搜索索引 | FTS5 虚拟表（trigram 分词器），列：`text`（参与搜索的字段拼接）、`table_name` / `row_id`（UNINDEXED，指回业务行）。由每张可搜索表的 `<表名>_fts_ai/au/ad` 触发器维护，软删除行在查询时按 `deleted_at` 过滤，不单独维护索引 |
 
 ## 日常
 
@@ -67,6 +68,8 @@
 | `foods` 常用食物 | `name`、`portion`（默认份量）、`calories`、`protein` |
 | `meals` | `date`、`meal_type`（早餐/午餐/晚餐/加餐）、`name`。同一天同餐次按需惰性创建 |
 | `meal_foods` | `meal_id`、`kind`（`planned` 计划 / `actual` 实际——两类分开存储与汇总）、`food_name`、`portion`、`calories`、`protein`（未掌握可空，汇总只计已填写值） |
+| `meal_templates` 餐食模板 | `name`、`meal_type`（建议餐次，可跨餐次套用）。删除时只软删除模板本身，模板食物保留，撤销可整体恢复 |
+| `meal_template_foods` | `template_id`、`food_name`、`portion`、`calories`、`protein`、`sort`。套用模板 = 把这些行追加成目标餐次的 `meal_foods` |
 
 ## 游戏娱乐
 
@@ -83,3 +86,5 @@
 | `backups/manifest.json` | 备份的备注与"长期保留"标记（存主库外，恢复覆盖主库时不丢失） |
 | `logs/app.log` | 启动器方式运行时的服务日志 |
 | `my_days.pid` | 服务进程记录（启动器识别旧服务用） |
+
+桌面版另有一份**外壳偏好**（`desktop-prefs.json`，存于 Electron 的 userData 目录）：只记录"关闭窗口时保留在托盘"等窗口行为，不含任何业务数据；开机自启由系统登录项管理，不落本地文件。

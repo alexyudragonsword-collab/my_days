@@ -168,7 +168,8 @@ test('AC-037 损坏的备份被拒绝且当前数据不受影响', async () => {
   fs.writeFileSync(path.join(dataDir, 'backups', bad), 'not a database');
   const before = await api('GET', '/api/t/plan_items');
   const restore = await api('POST', `/api/backups/${bad}/restore`);
-  assert.equal(restore.status, 500);
+  assert.equal(restore.status, 400);
+  assert.equal(restore.data.code, 'BACKUP_INVALID');
   const after = await api('GET', '/api/t/plan_items');
   assert.equal(after.data.rows.length, before.data.rows.length);
   fs.unlinkSync(path.join(dataDir, 'backups', bad));
@@ -275,4 +276,97 @@ test('保存并退出接口能安全关闭服务', async () => {
   await waitForHealth();
   const { data } = await api('GET', '/api/t/plan_items');
   assert.ok(data.rows.length > 0);
+});
+
+test('全局搜索走 FTS5 索引：中文子串命中、改动同步、软删除排除', async () => {
+  const created = await api('POST', '/api/t/games', { name: '塞尔达传说', notes: '探索海拉鲁大陆', status: '想玩' });
+  const id = created.data.row.id;
+
+  // trigram 分词器支持任意位置的子串匹配（非词首也能命中）
+  const hit = await api('GET', `/api/search?q=${encodeURIComponent('海拉鲁')}`);
+  assert.equal(hit.data.mode, 'fts');
+  assert.ok(hit.data.groups.some((g) => g.results.some((r) => r.id === id && r.table === 'games')));
+
+  // 触发器保证索引跟随数据更新
+  await api('PATCH', `/api/t/games/${id}`, { notes: '改成探索圣地遗迹' });
+  const stale = await api('GET', `/api/search?q=${encodeURIComponent('海拉鲁')}`);
+  assert.equal(stale.data.groups.length, 0);
+  const fresh = await api('GET', `/api/search?q=${encodeURIComponent('圣地遗迹')}`);
+  assert.ok(fresh.data.groups.some((g) => g.results.some((r) => r.id === id)));
+
+  // 软删除的记录不出现在搜索结果中，恢复后重新出现
+  await api('DELETE', `/api/t/games/${id}`);
+  const deleted = await api('GET', `/api/search?q=${encodeURIComponent('圣地遗迹')}`);
+  assert.equal(deleted.data.groups.length, 0);
+  await api('POST', '/api/trash/restore', { table: 'games', id });
+  const restored = await api('GET', `/api/search?q=${encodeURIComponent('圣地遗迹')}`);
+  assert.ok(restored.data.groups.some((g) => g.results.some((r) => r.id === id)));
+});
+
+test('不足三个字符的关键词回退到 LIKE 查询', async () => {
+  const res = await api('GET', `/api/search?q=${encodeURIComponent('塞尔')}`);
+  assert.equal(res.data.mode, 'like');
+  assert.ok(res.data.groups.some((g) => g.results.some((r) => String(r.title).includes('塞尔达'))));
+});
+
+test('首页“需要关注”由服务端跨表聚合', async () => {
+  await api('POST', '/api/t/plan_items', { title: '逾期的事项', date: '2020-05-06', status: '未开始' });
+  await api('POST', '/api/t/plan_items', { title: '已完成的旧事项', date: '2020-05-06', status: '已完成' });
+  const res = await api('GET', '/api/home/attention?today=2020-05-08');
+  assert.equal(res.status, 200);
+  const overdue = res.data.items.find((i) => i.title === '逾期的事项');
+  assert.ok(overdue, '逾期未完成的事项应出现在需要关注中');
+  assert.equal(overdue.reason, 'PLAN_OVERDUE');
+  assert.equal(overdue.level, 'danger');
+  assert.deepEqual(overdue.args, ['2020-05-06']);
+  // 已完成的事项不应被提醒
+  assert.ok(!res.data.items.some((i) => i.title === '已完成的旧事项'));
+});
+
+test('周报/月报接口按区间汇总完成率与各模块投入', async () => {
+  await api('POST', '/api/t/plan_items', { title: '报表-完成', date: '2021-03-02', status: '已完成', duration_min: 60 });
+  await api('POST', '/api/t/plan_items', { title: '报表-未完成', date: '2021-03-03', status: '未开始', duration_min: 30 });
+  await api('POST', '/api/t/plan_items', { title: '报表-取消', date: '2021-03-03', status: '已取消' });
+  await api('POST', '/api/t/game_sessions', { game_id: 1, start_time: '2021-03-02T20:00:00', duration_min: 45 });
+
+  const res = await api('GET', '/api/report?from=2021-03-01&to=2021-03-07');
+  assert.equal(res.status, 200);
+  assert.equal(res.data.plan.done, 1);
+  assert.equal(res.data.plan.pending, 1);
+  assert.equal(res.data.plan.cancelled, 1);
+  // 完成率分母排除已取消：1/2 = 50%
+  assert.equal(res.data.plan.rate, 50);
+  assert.equal(res.data.plan.plannedMinutes, 90);
+  assert.equal(res.data.modules.games.minutes, 45);
+  assert.equal(res.data.daily.length, 2);
+
+  // 区间之外的数据不计入
+  const empty = await api('GET', '/api/report?from=2019-01-01&to=2019-01-07');
+  assert.equal(empty.data.plan.total, 0);
+
+  const bad = await api('GET', '/api/report?from=x&to=2021-03-07');
+  assert.equal(bad.status, 400);
+  assert.equal(bad.data.code, 'BAD_REQUEST');
+});
+
+test('所有失败响应都带稳定错误码，且客户端登记了对应文案', async () => {
+  const unknown = await api('GET', '/api/t/not_a_table');
+  assert.equal(unknown.data.code, 'UNKNOWN_TABLE');
+
+  // 非法 JSON 由中间件抛出，仍然归一为稳定错误码
+  const malformed = await fetch(`${BASE}/api/t/memos`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{bad json',
+  });
+  assert.equal(malformed.status, 400);
+  assert.equal((await malformed.json()).code, 'BAD_REQUEST');
+
+  // 错误码清单与客户端词典保持一致
+  const errorsSrc = fs.readFileSync(path.join(projectRoot, 'server', 'src', 'errors.ts'), 'utf8');
+  const codes = [...errorsSrc.matchAll(/^\s{2}'([A-Z_]+)',$/gm)].map((m) => m[1]);
+  assert.ok(codes.length >= 10, '应能解析出错误码清单');
+  const i18nSrc = fs.readFileSync(path.join(projectRoot, 'client', 'src', 'i18n.tsx'), 'utf8');
+  const dict = i18nSrc.slice(i18nSrc.indexOf('const SERVER_ERRORS'), i18nSrc.indexOf('export function serverErrorMessage'));
+  for (const code of codes) {
+    assert.ok(new RegExp(`\\b${code}:`).test(dict), `错误码 ${code} 未在 client/src/i18n.tsx 的 SERVER_ERRORS 中登记`);
+  }
 });

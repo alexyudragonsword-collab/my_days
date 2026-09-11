@@ -109,6 +109,9 @@ export function invalidateTable(...tables: string[]) {
   for (const t of tables) {
     queryClient.invalidateQueries({ queryKey: ['t', t] });
   }
+  // 首页“需要关注”与统计由服务端跨表聚合，任一业务表变化后都需刷新
+  queryClient.invalidateQueries({ queryKey: ['attention'] });
+  queryClient.invalidateQueries({ queryKey: ['report'] });
 }
 
 export function todayStr(d = new Date()): string {

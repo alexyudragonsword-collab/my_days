@@ -12,6 +12,7 @@ import FitnessPage from './pages/Fitness';
 import GamesPage from './pages/Games';
 import HomePage from './pages/Home';
 import MediaPage from './pages/Media';
+import ReportPage from './pages/Report';
 import SettingsPage from './pages/SettingsPage';
 import TodayPlanPage from './pages/TodayPlan';
 import { QuickAddModal } from './QuickAdd';
@@ -22,6 +23,7 @@ const NAV_GROUPS = [
     items: [
       { to: '/', label: '首页总览', icon: '🏠' },
       { to: '/plan', label: '今日计划', icon: '🗓️' },
+      { to: '/report', label: '统计报表', icon: '📊' },
     ],
   },
   {
@@ -57,6 +59,7 @@ export function routeForRecord(table: string, id: number): string {
     fitness_templates: '/fitness', fitness_sessions: '/fitness', fitness_session_sets: '/fitness',
     fitness_template_exercises: '/fitness', body_metrics: '/fitness',
     foods: '/diet', meals: '/diet', meal_foods: '/diet',
+    meal_templates: '/diet', meal_template_foods: '/diet',
     games: '/games', game_sessions: '/games',
   };
   const base = map[table] || '/';
@@ -193,21 +196,90 @@ function TopBar(props: { onSearch: () => void; onQuickAdd: () => void }) {
   );
 }
 
+/** 侧栏顺序展开成的扁平列表：数字快捷键按此顺序对应（0 = 第 10 项） */
+const NAV_FLAT = NAV_GROUPS.flatMap((g) => g.items);
+
+export const SHORTCUTS: { keys: string; desc: string }[] = [
+  { keys: 'Ctrl / ⌘ + K', desc: '打开全局搜索' },
+  { keys: 'N', desc: '快速新增（Ctrl / ⌘ + N 在桌面版同样可用）' },
+  { keys: '1 … 9 / 0', desc: '按侧栏顺序切换页面（0 为数据与设置）' },
+  { keys: '?', desc: '显示本快捷键列表' },
+  { keys: 'Esc', desc: '关闭弹窗或面板' },
+];
+
+function ShortcutHelp(props: { onClose: () => void }) {
+  return (
+    <Modal title={t('键盘快捷键')} onClose={props.onClose} width={460}>
+      {SHORTCUTS.map((s) => (
+        <div className="list-item" key={s.keys}>
+          <span className="badge accent">{s.keys}</span>
+          <span className="title small">{t(s.desc)}</span>
+        </div>
+      ))}
+      <p className="small muted" style={{ marginBottom: 0 }}>
+        {t('在输入框中打字时，单键快捷键不会触发。')}
+      </p>
+    </Modal>
+  );
+}
+
+/** 判断焦点是否在可输入元素中：单键快捷键此时不应触发 */
+function isTypingTarget(el: EventTarget | null): boolean {
+  const node = el as HTMLElement | null;
+  if (!node || !node.tagName) return false;
+  return ['INPUT', 'TEXTAREA', 'SELECT'].includes(node.tagName) || node.isContentEditable;
+}
+
 function Shell() {
   const [collapsed, setCollapsed] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
+    const gotoIndex = (index: number) => {
+      const item = NAV_FLAT[index];
+      if (item) navigate(item.to);
+    };
     const onKey = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+      const mod = e.ctrlKey || e.metaKey;
+      if (e.altKey) return;
+      const key = e.key.toLowerCase();
+      if (mod && key === 'k') {
         e.preventDefault();
         setSearchOpen((o) => !o);
+        return;
+      }
+      // 浏览器保留了 Ctrl+N 与 Ctrl+数字，这些组合主要在桌面版生效
+      if (mod && key === 'n') {
+        e.preventDefault();
+        setQuickAddOpen(true);
+        return;
+      }
+      if (mod && /^[0-9]$/.test(e.key)) {
+        e.preventDefault();
+        gotoIndex(e.key === '0' ? 9 : Number(e.key) - 1);
+        return;
+      }
+      if (e.key === 'Escape' && helpOpen) {
+        setHelpOpen(false);
+        return;
+      }
+      // 单键快捷键：仅在没有输入焦点、且没有打开面板时生效
+      if (e.shiftKey && e.key !== '?') return;
+      if (isTypingTarget(e.target) || searchOpen || quickAddOpen || helpOpen) return;
+      if (e.key === '?') {
+        setHelpOpen(true);
+      } else if (key === 'n') {
+        setQuickAddOpen(true);
+      } else if (/^[0-9]$/.test(e.key)) {
+        gotoIndex(e.key === '0' ? 9 : Number(e.key) - 1);
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, []);
+  }, [navigate, searchOpen, quickAddOpen, helpOpen]);
 
   return (
     <div className="layout">
@@ -230,9 +302,14 @@ function Shell() {
             ))}
           </div>
         ))}
-        <button className="collapse-btn" onClick={() => setCollapsed((c) => !c)}>
-          {collapsed ? '»' : '« ' + t('收起导航')}
-        </button>
+        <div className="nav-footer">
+          <button className="collapse-btn" title={t('键盘快捷键')} onClick={() => setHelpOpen(true)}>
+            {collapsed ? '⌨' : '⌨ ' + t('键盘快捷键')}
+          </button>
+          <button className="collapse-btn" onClick={() => setCollapsed((c) => !c)}>
+            {collapsed ? '»' : '« ' + t('收起导航')}
+          </button>
+        </div>
       </div>
       <div className="main">
         <TopBar onSearch={() => setSearchOpen(true)} onQuickAdd={() => setQuickAddOpen(true)} />
@@ -240,6 +317,7 @@ function Shell() {
           <Routes>
             <Route path="/" element={<HomePage />} />
             <Route path="/plan" element={<TodayPlanPage />} />
+            <Route path="/report" element={<ReportPage />} />
             <Route path="/media" element={<MediaPage />} />
             <Route path="/dev" element={<DevPage />} />
             <Route path="/consult" element={<ConsultPage />} />
@@ -252,6 +330,7 @@ function Shell() {
       </div>
       {searchOpen && <SearchPalette onClose={() => setSearchOpen(false)} />}
       {quickAddOpen && <QuickAddModal onClose={() => setQuickAddOpen(false)} />}
+      {helpOpen && <ShortcutHelp onClose={() => setHelpOpen(false)} />}
     </div>
   );
 }

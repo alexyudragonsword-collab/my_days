@@ -1,10 +1,11 @@
+import { useQuery } from '@tanstack/react-query';
 import React, { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { addDays, createRow, invalidateTable, Row, todayStr, updateRow } from '../api';
+import { addDays, apiGet, createRow, invalidateTable, Row, todayStr, updateRow } from '../api';
 import { routeForRecord } from '../App';
 import { PlanItemRow } from '../components/PlanItemRow';
 import { useSoftDelete, useTable } from '../hooks';
-import { useSettings } from '../settings';
+import { orderedSummaryKeys, useSettings } from '../settings';
 import { PlanItemEditor, sortPlanItems } from './TodayPlan';
 import { t } from '../i18n';
 import { Dropdown, EmptyState, fmtMinutes, QueryView, useUI } from '../ui';
@@ -206,76 +207,40 @@ function InactiveMemosToggle(props: { rows: Row[]; show: boolean; setShow: (v: b
   );
 }
 
-// ---- 需要关注 ----
+// ---- 需要关注（服务端跨表聚合，客户端只负责按当前语言渲染原因） ----
+const ATTENTION_REASONS: Record<string, string> = {
+  PLAN_OVERDUE: '{0} 的计划未完成',
+  FOLLOWUP_DUE: '跟进时间 {0} 已到',
+  FOLLOWUP_SOON: '{0} 需跟进',
+  DELIVERABLE_OVERDUE: '交付已于 {0} 到期',
+  DELIVERABLE_DUE: '交付截止 {0}',
+  FITNESS_PENDING: '今天计划的训练还未完成',
+  MEDIA_PLANNED_DUE: '计划发布日期 {0} 已到',
+};
+
+const ATTENTION_FALLBACK_TITLES: Record<string, string> = {
+  consult_followups: '客户跟进',
+  fitness_sessions: '今日训练',
+};
+
+interface AttentionItem {
+  key: string;
+  table: string;
+  id: number;
+  title: string;
+  reason: string;
+  args: string[];
+  level: 'warn' | 'danger';
+}
+
 function AttentionPanel() {
   const today = todayStr();
   const navigate = useNavigate();
-  // 限定 90 天窗口，避免数据积累后全量拉取
-  const overdueQuery = useTable('plan_items', { date_from: addDays(today, -90), date_to: addDays(today, -1) });
-  const followupsQuery = useTable('consult_followups', { done: 0 });
-  const deliverablesQuery = useTable('consult_deliverables');
-  const sessionsQuery = useTable('fitness_sessions', { date: today });
-  const mediaQuery = useTable('media_contents', { archived: 0 });
-
-  const items: { key: string; text: string; reason: string; route: string; level: 'warn' | 'danger' }[] = [];
-  for (const r of overdueQuery.data || []) {
-    if (r.status === '未开始' || r.status === '进行中') {
-      items.push({
-        key: 'p' + r.id,
-        text: String((r.source_title as string) ?? r.title),
-        reason: t('{0} 的计划未完成', String(r.date)),
-        route: routeForRecord('plan_items', r.id),
-        level: 'danger',
-      });
-    }
-  }
-  for (const f of followupsQuery.data || []) {
-    const ft = String(f.next_time || '').slice(0, 10);
-    if (ft && ft <= addDays(today, 2)) {
-      items.push({
-        key: 'f' + f.id,
-        text: String(f.content) || t('客户跟进'),
-        reason: ft <= today ? t('跟进时间 {0} 已到', ft) : t('{0} 需跟进', ft),
-        route: routeForRecord('consult_followups', f.id),
-        level: ft <= today ? 'danger' : 'warn',
-      });
-    }
-  }
-  for (const d of deliverablesQuery.data || []) {
-    const due = String(d.due_date || '');
-    if (d.status !== '已完成' && due && due <= addDays(today, 3)) {
-      items.push({
-        key: 'd' + d.id,
-        text: String(d.name),
-        reason: due < today ? t('交付已于 {0} 到期', due) : t('交付截止 {0}', due),
-        route: routeForRecord('consult_deliverables', d.id),
-        level: due <= today ? 'danger' : 'warn',
-      });
-    }
-  }
-  for (const s of sessionsQuery.data || []) {
-    if (s.status !== '已完成') {
-      items.push({
-        key: 's' + s.id,
-        text: String(s.name) || t('今日训练'),
-        reason: t('今天计划的训练还未完成'),
-        route: routeForRecord('fitness_sessions', s.id),
-        level: 'warn',
-      });
-    }
-  }
-  for (const m of mediaQuery.data || []) {
-    const pd = String(m.planned_date || '');
-    if (m.stage !== '已发布' && pd && pd <= today) {
-      items.push({
-        key: 'm' + m.id,
-        text: String(m.title),
-        reason: t('计划发布日期 {0} 已到', pd),
-        route: routeForRecord('media_contents', m.id),
-        level: 'warn',
-      });
-    }
-  }
+  const query = useQuery({
+    queryKey: ['attention', today],
+    queryFn: () => apiGet<{ items: AttentionItem[] }>(`/api/home/attention?today=${today}`),
+  });
+  const items = query.data?.items || [];
 
   return (
     <div className="card">
@@ -284,10 +249,10 @@ function AttentionPanel() {
         <p className="small muted" style={{ margin: 0 }}>{t('暂时没有需要特别关注的事项 ✅')}</p>
       ) : (
         items.slice(0, 8).map((it) => (
-          <div className="list-item clickable" key={it.key} onClick={() => navigate(it.route)}>
+          <div className="list-item clickable" key={it.key} onClick={() => navigate(routeForRecord(it.table, it.id))}>
             <span className={'badge ' + it.level}>!</span>
-            <span className="title">{it.text}</span>
-            <span className="small muted">{it.reason}</span>
+            <span className="title">{it.title || t(ATTENTION_FALLBACK_TITLES[it.table] || '记录')}</span>
+            <span className="small muted">{t(ATTENTION_REASONS[it.reason] || it.reason, ...it.args)}</span>
           </div>
         ))
       )}
@@ -390,6 +355,10 @@ function SummaryCards() {
     if (planned.length) lines.push({ text: t('今天安排了 {0} 段娱乐时间', planned.length) });
     cards.push({ key: 'games', title: '🎮 ' + t('游戏娱乐'), route: '/games', lines });
   }
+
+  // 卡片顺序跟随偏好设置（纯界面顺序，不影响数据）
+  const order = orderedSummaryKeys(settings.home_summary_order);
+  cards.sort((a, b) => order.indexOf(a.key) - order.indexOf(b.key));
 
   return (
     <>

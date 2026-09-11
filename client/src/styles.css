@@ -96,6 +96,8 @@ a { color: var(--accent); text-decoration: none; }
   color: var(--accent);
   font-weight: 600;
 }
+.sidebar .nav-footer { margin-top: auto; padding-bottom: 6px; }
+.sidebar .nav-footer .collapse-btn { display: block; width: calc(100% - 16px); margin: 0 8px 6px; }
 .sidebar .collapse-btn {
   margin: auto 8px 12px;
   border: 1px solid var(--border);
@@ -393,6 +395,29 @@ table.tbl th { font-size: 12px; color: var(--text-2); font-weight: 500; }
 .menu button:hover { background: var(--panel-2); }
 .menu button.danger { color: var(--danger); }
 .menu-anchor { position: relative; }
+
+/* ==================== 统计报表 ==================== */
+.page-head .spacer { flex: 1; }
+.report-bars {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 6px;
+  height: 150px;
+  overflow-x: auto;
+}
+.report-bar { flex: 1 1 0; min-width: 16px; max-width: 72px; display: flex; flex-direction: column; height: 100%; }
+.report-bar .bar-track { flex: 1; display: flex; align-items: flex-end; }
+.report-bar .bar-total {
+  width: 100%;
+  min-height: 2px;
+  background: var(--accent-soft);
+  border-radius: 4px 4px 0 0;
+  display: flex;
+  align-items: flex-end;
+}
+.report-bar .bar-done { width: 100%; background: var(--accent); border-radius: 4px 4px 0 0; }
+.report-bar .bar-label { font-size: 11px; color: var(--text-2); margin-top: 4px; text-align: center; white-space: nowrap; }
 
 /* ==================== 外观选择器 ==================== */
 .appearance-grid {
@@ -723,3 +748,5 @@ table.tbl th { font-size: 12px; color: var(--text-2); font-weight: 500; }
 [data-appearance='brutal'] .stat .num { font-weight: 900; }
 [data-appearance='brutal'] .page-head h2 { font-weight: 900; text-decoration: underline 4px #ff70a6; text-underline-offset: 5px; }
 [data-appearance='brutal'] .appearance-option { border-width: 2px; border-color: var(--hard); }
+[data-appearance='brutal'] .report-bar .bar-total { border: 2px solid var(--hard); border-bottom: none; border-radius: 0; }
+[data-appearance='brutal'] .report-bar .bar-done { border-radius: 0; background: #3a5bff; }

@@ -4,7 +4,7 @@ import { MEAL_TYPES } from '../constants';
 import { useSoftDelete, useTable } from '../hooks';
 import { useSettings } from '../settings';
 import { t } from '../i18n';
-import { EmptyState, Field, Modal, QueryView, useUI } from '../ui';
+import { Dropdown, EmptyState, Field, Modal, QueryView, useUI } from '../ui';
 
 function GoalsCard() {
   const { settings, update } = useSettings();
@@ -134,8 +134,10 @@ export default function DietPage() {
   const mealsQuery = useTable('meals', { date });
   const mealFoodsQuery = useTable('meal_foods');
   const foodsQuery = useTable('foods');
+  const templatesQuery = useTable('meal_templates');
+  const templateFoods = useTable('meal_template_foods');
   const { settings, fmtDate } = useSettings();
-  const { toast, confirm } = useUI();
+  const { toast, confirm, prompt } = useUI();
   const softDelete = useSoftDelete();
 
   const meals = mealsQuery.data || [];
@@ -189,6 +191,59 @@ export default function DietPage() {
     toast(t('已复制餐食'));
   };
 
+  /** 把某一餐当前的食物列表存成模板（只复制食物明细，不关联原餐次记录） */
+  const saveAsTemplate = async (mealType: string, kind: 'planned' | 'actual', rows: Row[]) => {
+    if (rows.length === 0) {
+      toast(t('这一栏还没有食物，先添加再存为模板'), { error: true });
+      return;
+    }
+    const name = await prompt({
+      title: t('存为餐食模板'),
+      label: t('模板名称'),
+      defaultValue: `${t(mealType)}·${String(rows[0].food_name)}${rows.length > 1 ? t(' 等 {0} 项', rows.length) : ''}`,
+      validate: (v) => (v.trim() ? null : t('请填写模板名称')),
+    });
+    if (!name) return;
+    const tpl = await createRow('meal_templates', { name: name.trim(), meal_type: mealType });
+    let sort = 0;
+    for (const f of rows) {
+      await createRow('meal_template_foods', {
+        template_id: tpl.id,
+        food_name: f.food_name,
+        portion: f.portion ?? null,
+        calories: f.calories ?? null,
+        protein: f.protein ?? null,
+        sort: sort++,
+      });
+    }
+    invalidateTable('meal_templates', 'meal_template_foods');
+    toast(t('已存为模板「{0}」', name.trim()));
+  };
+
+  /** 套用模板：把模板中的食物追加到指定餐次的计划或实际中 */
+  const applyTemplate = async (template: Row, mealType: string, kind: 'planned' | 'actual') => {
+    const rows = (templateFoods.data || [])
+      .filter((f) => Number(f.template_id) === template.id)
+      .sort((a, b) => Number(a.sort) - Number(b.sort));
+    if (rows.length === 0) {
+      toast(t('该模板没有食物'), { error: true });
+      return;
+    }
+    const meal = await ensureMeal(mealType);
+    for (const f of rows) {
+      await createRow('meal_foods', {
+        meal_id: meal.id,
+        kind,
+        food_name: f.food_name,
+        portion: f.portion ?? null,
+        calories: f.calories ?? null,
+        protein: f.protein ?? null,
+      });
+    }
+    invalidateTable('meals', 'meal_foods');
+    toast(t('已套用模板，新增 {0} 项', rows.length));
+  };
+
   const calGoal = settings.diet_calories;
   const proteinGoal = settings.diet_protein;
 
@@ -198,9 +253,15 @@ export default function DietPage() {
         <h2>{t('饮食计划')}</h2>
         <input className="input" type="date" style={{ width: 150 }} value={date} onChange={(e) => setDate(e.target.value)} />
         <button className="btn" onClick={() => copyFrom(addDays(date, -1))}>{t('复制昨天餐食')}</button>
-        <button className="btn" onClick={() => {
-          const d = window.prompt(t('从哪一天复制？（YYYY-MM-DD）'));
-          if (d && /^\d{4}-\d{2}-\d{2}$/.test(d)) copyFrom(d);
+        <button className="btn" onClick={async () => {
+          const d = await prompt({
+            title: t('从指定日期复制餐食'),
+            label: t('复制哪一天的餐食'),
+            inputType: 'date',
+            defaultValue: addDays(date, -1),
+            validate: (v) => (/^\d{4}-\d{2}-\d{2}$/.test(v) ? null : t('请选择有效日期')),
+          });
+          if (d) copyFrom(d);
         }}>{t('从指定日期复制')}</button>
         <button className="btn" onClick={() => setFoodsOpen(true)}>{t('常用食物')}</button>
       </div>
@@ -263,6 +324,26 @@ export default function DietPage() {
                           </div>
                         ))}
                         <AddFoodForm foods={foodsQuery.data || []} onAdd={(food) => addFood(mt, kind, food)} />
+                        <div className="row small" style={{ marginTop: 4 }}>
+                          <button className="btn small" onClick={() => saveAsTemplate(mt, kind, foodsOf(kind))}>
+                            {t('存为模板')}
+                          </button>
+                          <Dropdown label={t('套用模板')}>
+                            {(templatesQuery.data || []).length === 0 ? (
+                              <button disabled>{t('还没有餐食模板')}</button>
+                            ) : (
+                              [...(templatesQuery.data || [])]
+                                // 同餐次的模板排在前面，但不限制跨餐次套用
+                                .sort((a, b) => Number(b.meal_type === mt) - Number(a.meal_type === mt))
+                                .map((tpl) => (
+                                  <button key={tpl.id} onClick={() => applyTemplate(tpl, mt, kind)}>
+                                    {String(tpl.name)}
+                                    {tpl.meal_type && tpl.meal_type !== mt ? `（${t(String(tpl.meal_type))}）` : ''}
+                                  </button>
+                                ))
+                            )}
+                          </Dropdown>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -272,6 +353,30 @@ export default function DietPage() {
           </>
         )}
       </QueryView>
+
+      {(templatesQuery.data || []).length > 0 && (
+        <div className="card">
+          <h3>{t('餐食模板')} <span className="sub">{t('在每餐的「套用模板」中使用')}</span></h3>
+          {(templatesQuery.data || []).map((tpl) => {
+            const items = (templateFoods.data || []).filter((f) => Number(f.template_id) === tpl.id);
+            return (
+              <div className="list-item small" key={tpl.id}>
+                <span className="title">
+                  {String(tpl.name)}
+                  <span className="muted">
+                    {tpl.meal_type ? `　${t(String(tpl.meal_type))}` : ''}
+                    {items.map((f) => String(f.food_name)).join(t('、')) || t('（空模板）')}
+                  </span>
+                </span>
+                {/* 与训练模板一致：只软删除模板本身，模板食物保留，撤销时整体恢复 */}
+                <button className="btn small danger" onClick={() => softDelete('meal_templates', tpl.id, '餐食模板')}>
+                  {t('删除')}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {foodsOpen && <FoodsManager foods={foodsQuery.data || []} onClose={() => setFoodsOpen(false)} />}
     </div>

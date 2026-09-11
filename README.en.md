@@ -8,13 +8,14 @@ A local, single-user work & life management app. It brings your daily plans, med
 
 - **Home**: today's overview, drag-and-drop timeline, unscheduled items, quick memos, needs-attention list, module summaries
 - **Today Plan**: today / week / history views, priorities, complete / cancel / postpone, daily review
-- **Media**: idea → to plan → producing → to publish → published kanban, publish links and performance stats
+- **Reports**: weekly / monthly view — completion rate, daily completion bars, play & consulting time, training volume, published content, average calories and weight change
+- **Media**: idea → to plan → producing → to publish → published kanban with per-platform filtering, publish links and performance stats
 - **Development**: projects, milestones, work items (feature / requirement / bug / tech issue), dev logs
-- **Consulting**: clients, projects, communications (with duration & fees), deliverables, follow-ups
-- **Fitness**: workout templates, per-set logging, last-time-same-exercise data, body metrics & trends
-- **Diet**: nutrition goals, planned vs. actual meals, frequent foods, daily summary
+- **Consulting**: clients, projects, communications (with duration & fees), deliverables, follow-ups, monthly income summary (fees and settlement status)
+- **Fitness**: workout templates (duplicate one and tweak it), per-set logging, last-time-same-exercise data, body metrics & trends
+- **Diet**: nutrition goals, planned vs. actual meals, frequent foods, meal templates (save a meal you eat often and apply it in one click), daily summary
 - **Games**: status list, play timer, progress & next goals, total play time (no deadline pressure)
-- **Data & Settings**: data file info, manual / daily automatic backups, safe restore, ZIP export & import, trash, preferences
+- **Data & Settings**: data file info, manual / daily automatic backups, safe restore, ZIP export & import, trash, home summary visibility & order, preferences
 - **Bilingual UI**: switch between 中文 and English in Settings → Preferences; business data is never touched by the switch
 - **Four appearances**: Default, Liquid Glass, Notion Notebook and Neo-Brutalism — each with light & dark themes
 
@@ -23,6 +24,10 @@ A local, single-user work & life management app. It brings your daily plans, med
 | Default | English UI |
 | --- | --- |
 | ![Default home](docs/screenshots/home-default.png) | ![English home](docs/screenshots/home-english.png) |
+
+| Reports (weekly / monthly) |
+| --- |
+| ![Reports](docs/screenshots/report.png) |
 
 | Liquid Glass | Notion Notebook | Neo-Brutalism |
 | --- | --- | --- |
@@ -74,11 +79,20 @@ Everything is stored in `data/my_days.db` (SQLite). Backups are independent file
 - **Export**: ZIP with machine-readable JSON plus one CSV per module.
 - **Import**: restore everything from an export ZIP (for migrating to a new computer); fully replaces current data after creating a safety backup.
 
+## Keyboard shortcuts
+
+`Ctrl / ⌘ + K` global search (full-text, substring matching for Chinese), `N` quick add, `1`–`9` / `0` switch pages in sidebar order, `?` show the shortcut list. Single-key shortcuts never fire while you are typing in a field.
+
 ## Desktop app (no Node.js required)
 
 Prefer not to install Node.js? Download the Electron desktop build from the repo's GitHub Actions "桌面版安装包" workflow (or a versioned Release): `.dmg` for macOS, `.exe` for Windows, `.AppImage` for Linux. The desktop build shares the same data directory as the source version, so you can mix both.
 
 > The installers are not notarized / code-signed. On first launch: macOS — right-click → Open; Windows — click "Run anyway".
+
+The desktop build also has:
+
+- **System tray**: open the main window, open the data directory, check for updates, save & quit. Two options are off by default — "keep in tray when the window is closed" and "start at login".
+- **Auto-update**: Windows / Linux download new versions in the background and ask to restart; on macOS the unsigned build cannot self-update, so it only points you to the release page.
 
 Build locally:
 

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { createRow, hardDeleteRow, invalidateTable, Row, todayStr, updateRow } from '../api';
+import { createRow, hardDeleteRow, invalidateTable, queryClient, Row, todayStr, updateRow } from '../api';
 import { useAddToPlan, useClearOpenParam, useOpenParam, useSoftDelete, useTable } from '../hooks';
 import { useSettings } from '../settings';
 import { t, weekdayCharLabel } from '../i18n';
@@ -273,7 +273,7 @@ export default function FitnessPage() {
   const setsQuery = useTable('fitness_session_sets');
   const [editingTemplate, setEditingTemplate] = useState<Row | null | 'new'>(null);
   const [activeSession, setActiveSession] = useState<Row | null>(null);
-  const { toast } = useUI();
+  const { toast, prompt } = useUI();
   const addToPlan = useAddToPlan();
   const softDelete = useSoftDelete();
   const openParam = useOpenParam();
@@ -323,6 +323,41 @@ export default function FitnessPage() {
     }
   };
 
+  /** 复制模板：连同动作一起复制一份，复制后直接打开编辑（“复制一份再改”比重建快） */
+  const duplicateTemplate = async (template: Row) => {
+    const name = await prompt({
+      title: t('复制训练模板'),
+      label: t('新模板名称'),
+      defaultValue: `${String(template.name)} ${t('副本')}`,
+      validate: (v) => (v.trim() ? null : t('请填写模板名称')),
+    });
+    if (!name) return;
+    const copy = await createRow('fitness_templates', {
+      name: name.trim(),
+      weekdays: template.weekdays ?? null,
+    });
+    const exs = (exercisesQuery.data || [])
+      .filter((e) => Number(e.template_id) === template.id)
+      .sort((a, b) => Number(a.sort) - Number(b.sort));
+    for (const ex of exs) {
+      await createRow('fitness_template_exercises', {
+        template_id: copy.id,
+        name: ex.name,
+        target_sets: ex.target_sets ?? null,
+        target_reps: ex.target_reps ?? null,
+        target_weight: ex.target_weight ?? null,
+        rest_sec: ex.rest_sec ?? null,
+        sort: ex.sort ?? 0,
+      });
+    }
+    invalidateTable('fitness_templates', 'fitness_template_exercises');
+    // 必须等动作列表刷新到位再打开编辑器：编辑器保存时会按当前列表重建动作，
+    // 若此时拿到的还是旧数据，复制过来的动作会被清空。
+    await queryClient.refetchQueries({ queryKey: ['t', 'fitness_template_exercises'] });
+    toast(t('已复制 {0} 个动作，可直接修改', exs.length));
+    setEditingTemplate(copy);
+  };
+
   const sessions = [...(sessionsQuery.data || [])].sort((a, b) => String(b.date).localeCompare(String(a.date)));
   const allSets = setsQuery.data || [];
   const completed = sessions.filter((s) => s.status === '已完成');
@@ -361,10 +396,17 @@ export default function FitnessPage() {
                     <Dropdown>
                       <button onClick={() => setEditingTemplate(tpl)}>{t('编辑模板')}</button>
                       <button onClick={() => startFromTemplate(tpl, todayStr(), false)}>{t('安排到今天')}</button>
-                      <button onClick={() => {
-                        const d = window.prompt(t('安排到哪一天？（YYYY-MM-DD）'), todayStr());
-                        if (d && /^\d{4}-\d{2}-\d{2}$/.test(d)) startFromTemplate(tpl, d, false);
+                      <button onClick={async () => {
+                        const d = await prompt({
+                          title: t('安排训练'),
+                          label: t('安排到哪一天'),
+                          inputType: 'date',
+                          defaultValue: todayStr(),
+                          validate: (v) => (/^\d{4}-\d{2}-\d{2}$/.test(v) ? null : t('请选择有效日期')),
+                        });
+                        if (d) startFromTemplate(tpl, d, false);
                       }}>{t('安排到指定日期…')}</button>
+                      <button onClick={() => duplicateTemplate(tpl)}>{t('复制模板…')}</button>
                       <button onClick={() => addToPlan({ title: t('训练：') + String(tpl.name), sourceModule: 'fitness_template', sourceId: tpl.id })}>
                         {t('加入今日计划')}
                       </button>
